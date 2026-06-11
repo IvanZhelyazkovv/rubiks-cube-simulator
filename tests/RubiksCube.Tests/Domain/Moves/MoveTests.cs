@@ -29,13 +29,4 @@ public sealed class MoveTests
 
         Assert.Equal(new Move(Face.Right, expected), move.Inverse);
     }
-
-    [Theory]
-    [InlineData(RotationDirection.Clockwise, 1)]
-    [InlineData(RotationDirection.HalfTurn, 2)]
-    [InlineData(RotationDirection.CounterClockwise, 3)]
-    public void QuarterTurns_CountsClockwiseQuarterTurns(RotationDirection direction, int expected)
-    {
-        Assert.Equal(expected, new Move(Face.Up, direction).QuarterTurns);
-    }
 }

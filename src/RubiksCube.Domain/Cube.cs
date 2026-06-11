@@ -198,6 +198,8 @@ public sealed class Cube : IEquatable<Cube>
 
     private Cube ApplyQuarterTurn(Face face, bool clockwise)
     {
+        // "Clockwise" is as seen looking at the face from outside the cube —
+        // that is, from the tip of its outward normal.
         var axis = FaceOrientation.Of(face).Normal;
         var rotated = _stickers.ToArray();
 
@@ -237,7 +239,8 @@ public sealed class Cube : IEquatable<Cube>
     /// <summary>
     /// Maps a sticker's grid position to its centre in doubled cube coordinates:
     /// the face plane at N along the normal, plus offsets 2i − (N − 1) along the
-    /// face's row and column directions.
+    /// face's row and column directions. For a 3×3, in-plane offsets are −2, 0
+    /// and 2 while face planes sit at ±3 — everything stays an exact integer.
     /// </summary>
     private Vector3Int PositionOf(FaceOrientation orientation, int row, int column) =>
         (Size * orientation.Normal)

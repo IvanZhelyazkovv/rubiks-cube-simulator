@@ -10,17 +10,6 @@ namespace RubiksCube.Domain.Moves;
 public readonly record struct Move(Face Face, RotationDirection Direction)
 {
     /// <summary>
-    /// The number of clockwise quarter turns this move is equivalent to (1, 2 or 3).
-    /// </summary>
-    public int QuarterTurns => Direction switch
-    {
-        RotationDirection.Clockwise => 1,
-        RotationDirection.HalfTurn => 2,
-        RotationDirection.CounterClockwise => 3,
-        _ => throw new InvalidOperationException($"Unknown rotation direction '{Direction}'."),
-    };
-
-    /// <summary>
     /// The move that undoes this one: <c>F</c> ↔ <c>F'</c>, while <c>F2</c> is its own inverse.
     /// </summary>
     public Move Inverse => Direction switch

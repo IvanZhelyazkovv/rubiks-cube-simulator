@@ -20,7 +20,7 @@ public sealed class CubeUseCasesTests
         Assert.Equal(4, cube.Size);
         Assert.True(cube.IsSolved);
         Assert.Empty(cube.History);
-        Assert.Equal(["WWWW", "WWWW", "WWWW", "WWWW"], cube.Faces["up"]);
+        Assert.Equal(["WWWW", "WWWW", "WWWW", "WWWW"], cube.Faces.Up);
     }
 
     [Theory]
@@ -45,12 +45,12 @@ public sealed class CubeUseCasesTests
         Assert.Equal(["F", "R'", "U", "B'", "L", "D'"], updated.History);
 
         // The task scenario, face by face (rows from top to bottom).
-        Assert.Equal(["ROG", "BWW", "BBB"], updated.Faces["up"]);
-        Assert.Equal(["ORR", "OGW", "WWW"], updated.Faces["front"]);
-        Assert.Equal(["YBO", "RRW", "OYR"], updated.Faces["right"]);
-        Assert.Equal(["YBW", "OBY", "YYW"], updated.Faces["back"]);
-        Assert.Equal(["GYY", "OOG", "BGO"], updated.Faces["left"]);
-        Assert.Equal(["GGB", "RYR", "RGG"], updated.Faces["down"]);
+        Assert.Equal(["ROG", "BWW", "BBB"], updated.Faces.Up);
+        Assert.Equal(["ORR", "OGW", "WWW"], updated.Faces.Front);
+        Assert.Equal(["YBO", "RRW", "OYR"], updated.Faces.Right);
+        Assert.Equal(["YBW", "OBY", "YYW"], updated.Faces.Back);
+        Assert.Equal(["GYY", "OOG", "BGO"], updated.Faces.Left);
+        Assert.Equal(["GGB", "RYR", "RGG"], updated.Faces.Down);
     }
 
     [Fact]
@@ -58,6 +58,21 @@ public sealed class CubeUseCasesTests
     {
         Assert.Throws<CubeSessionNotFoundException>(
             () => new ApplyMovesUseCase(_repository).Execute(Guid.NewGuid(), "F"));
+    }
+
+    [Fact]
+    public void ApplyMoves_RejectsMoreMovesThanThePolicyAllows()
+    {
+        var created = new CreateCubeUseCase(_repository).Execute();
+        var oversized = string.Join(' ', Enumerable.Repeat("F", ApplyMovesUseCase.MaxMovesPerRequest + 1));
+
+        var exception = Assert.Throws<TooManyMovesException>(
+            () => new ApplyMovesUseCase(_repository).Execute(created.Id, oversized));
+
+        Assert.Equal(ApplyMovesUseCase.MaxMovesPerRequest + 1, exception.Count);
+
+        // A rejected request must not partially apply.
+        Assert.Empty(new GetCubeUseCase(_repository).Execute(created.Id).History);
     }
 
     [Fact]

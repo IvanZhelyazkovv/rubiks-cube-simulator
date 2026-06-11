@@ -57,12 +57,15 @@ public sealed class InMemoryCubeSessionRepository : ICubeSessionRepository
     {
         ArgumentNullException.ThrowIfNull(session);
 
-        EvictLeastRecentlyTouchedWhileFull();
-
         if (!_sessions.TryAdd(session.Id, NewEntry(session)))
         {
             throw new InvalidOperationException($"A session with id '{session.Id}' already exists.");
         }
+
+        // Evicting after the add keeps a duplicate-id failure from costing an
+        // innocent session; the count may transiently exceed capacity by the
+        // number of concurrent adds, which is harmless.
+        EvictLeastRecentlyTouchedWhileOverCapacity(protectedId: session.Id);
     }
 
     /// <inheritdoc />
@@ -94,15 +97,21 @@ public sealed class InMemoryCubeSessionRepository : ICubeSessionRepository
     private Entry NewEntry(CubeSession session) =>
         new(session, Interlocked.Increment(ref _clock));
 
+    // The compare-and-swap below relies on Entry being a record: TryUpdate
+    // compares the stored entry to the one this thread read by value, so a
+    // concurrent change (different session or timestamp) makes the swap fail
+    // harmlessly instead of overwriting it.
     private void Touch(Guid id, Entry entry) =>
         _sessions.TryUpdate(id, entry with { Touched = Interlocked.Increment(ref _clock) }, entry);
 
-    private void EvictLeastRecentlyTouchedWhileFull()
+    private void EvictLeastRecentlyTouchedWhileOverCapacity(Guid protectedId)
     {
-        while (_sessions.Count >= _capacity)
+        while (_sessions.Count > _capacity)
         {
-            var oldest = _sessions.MinBy(pair => pair.Value.Touched);
-            if (oldest.Key == Guid.Empty && oldest.Value is null)
+            var oldest = _sessions
+                .Where(pair => pair.Key != protectedId)
+                .MinBy(pair => pair.Value.Touched);
+            if (oldest.Value is null)
             {
                 return;
             }

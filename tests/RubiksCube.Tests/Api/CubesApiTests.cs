@@ -32,7 +32,7 @@ public sealed class CubesApiTests : IClassFixture<WebApplicationFactory<Program>
         Assert.NotNull(cube);
         Assert.Equal(3, cube.Size);
         Assert.True(cube.IsSolved);
-        Assert.Equal(["WWW", "WWW", "WWW"], cube.Faces["up"]);
+        Assert.Equal(["WWW", "WWW", "WWW"], cube.Faces.Up);
     }
 
     [Fact]
@@ -56,12 +56,12 @@ public sealed class CubesApiTests : IClassFixture<WebApplicationFactory<Program>
         var cube = await response.Content.ReadFromJsonAsync<CubeStateDto>();
 
         Assert.NotNull(cube);
-        Assert.Equal(["ROG", "BWW", "BBB"], cube.Faces["up"]);
-        Assert.Equal(["ORR", "OGW", "WWW"], cube.Faces["front"]);
-        Assert.Equal(["YBO", "RRW", "OYR"], cube.Faces["right"]);
-        Assert.Equal(["YBW", "OBY", "YYW"], cube.Faces["back"]);
-        Assert.Equal(["GYY", "OOG", "BGO"], cube.Faces["left"]);
-        Assert.Equal(["GGB", "RYR", "RGG"], cube.Faces["down"]);
+        Assert.Equal(["ROG", "BWW", "BBB"], cube.Faces.Up);
+        Assert.Equal(["ORR", "OGW", "WWW"], cube.Faces.Front);
+        Assert.Equal(["YBO", "RRW", "OYR"], cube.Faces.Right);
+        Assert.Equal(["YBW", "OBY", "YYW"], cube.Faces.Back);
+        Assert.Equal(["GYY", "OOG", "BGO"], cube.Faces.Left);
+        Assert.Equal(["GGB", "RYR", "RGG"], cube.Faces.Down);
         Assert.Equal(["F", "R'", "U", "B'", "L", "D'"], cube.History);
     }
 
@@ -72,6 +72,18 @@ public sealed class CubesApiTests : IClassFixture<WebApplicationFactory<Program>
 
         var response = await _client.PostAsJsonAsync(
             $"/api/cubes/{created.Id}/moves", new { moves = "F X" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ApplyMoves_WithExcessiveMoveCount_ReturnsBadRequestProblem()
+    {
+        var created = await CreateCubeAsync();
+        var oversized = string.Join(' ', Enumerable.Repeat("F", 201));
+
+        var response = await _client.PostAsJsonAsync(
+            $"/api/cubes/{created.Id}/moves", new { moves = oversized });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }

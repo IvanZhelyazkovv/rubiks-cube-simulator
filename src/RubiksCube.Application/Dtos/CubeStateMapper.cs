@@ -11,32 +11,25 @@ namespace RubiksCube.Application.Dtos;
 /// </summary>
 public static class CubeStateMapper
 {
-    private static readonly (Face Face, string Name)[] FaceNames =
-    [
-        (Face.Up, "up"),
-        (Face.Down, "down"),
-        (Face.Front, "front"),
-        (Face.Back, "back"),
-        (Face.Left, "left"),
-        (Face.Right, "right"),
-    ];
-
     /// <summary>Maps the given <paramref name="session"/> to a <see cref="CubeStateDto"/>.</summary>
     /// <param name="session">The session to map.</param>
     public static CubeStateDto ToDto(CubeSession session)
     {
         ArgumentNullException.ThrowIfNull(session);
 
-        var faces = new Dictionary<string, IReadOnlyList<string>>();
-        foreach (var (face, name) in FaceNames)
-        {
-            faces[name] = FaceRows(session.Cube, face);
-        }
+        var cube = session.Cube;
+        var faces = new CubeFacesDto(
+            Up: FaceRows(cube, Face.Up),
+            Down: FaceRows(cube, Face.Down),
+            Front: FaceRows(cube, Face.Front),
+            Back: FaceRows(cube, Face.Back),
+            Left: FaceRows(cube, Face.Left),
+            Right: FaceRows(cube, Face.Right));
 
         return new CubeStateDto(
             session.Id,
-            session.Cube.Size,
-            session.Cube.IsSolved,
+            cube.Size,
+            cube.IsSolved,
             faces,
             [.. session.History.Select(move => move.ToString())]);
     }

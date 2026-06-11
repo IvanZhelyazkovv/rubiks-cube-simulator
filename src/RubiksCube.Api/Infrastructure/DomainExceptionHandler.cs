@@ -25,6 +25,7 @@ public sealed class DomainExceptionHandler(IProblemDetailsService problemDetails
             InvalidMoveNotationException => (StatusCodes.Status400BadRequest, "Invalid move notation"),
             InvalidCubeSizeException => (StatusCodes.Status400BadRequest, "Invalid cube size"),
             InvalidScrambleLengthException => (StatusCodes.Status400BadRequest, "Invalid scramble length"),
+            TooManyMovesException => (StatusCodes.Status400BadRequest, "Too many moves"),
             EmptyMoveHistoryException => (StatusCodes.Status409Conflict, "Nothing to undo"),
             _ => null,
         };
