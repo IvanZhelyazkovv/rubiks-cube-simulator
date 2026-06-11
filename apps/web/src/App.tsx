@@ -111,6 +111,7 @@ export default function App() {
                   Rotate a face
                 </h2>
                 <MovePad
+                  size={session.state.size}
                   disabled={session.busy && !session.queueing}
                   onMove={session.applySequence}
                 />
