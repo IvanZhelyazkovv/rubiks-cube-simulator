@@ -1,16 +1,30 @@
 # Rubik's Cube Simulator
 
-A programmatic Rubik's cube that can correctly rotate any face — modelled with Clean Architecture on .NET 10. The cube starts solved and oriented as on [rubiks-cube-solver.com](https://rubiks-cube-solver.com/): green at the front, red on the right, white on top.
+[![CI](https://github.com/IvanZhelyazkovv/rubiks-cube-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/IvanZhelyazkovv/rubiks-cube-simulator/actions/workflows/ci.yml)
 
-## Quick start
+A programmatic Rubik's cube that can correctly rotate any face — a pure .NET domain
+model behind a console runner, a REST API and an interactive 3D web UI. Supports any
+cube size from 2×2 up (3×3 by default). The cube starts solved and oriented as on
+[rubiks-cube-solver.com](https://rubiks-cube-solver.com/): **green at the front, red
+on the right, white on top**.
 
-Requires only the free [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (Windows, Linux or macOS).
+## Prerequisites
+
+| Tool | Needed for | Notes |
+|---|---|---|
+| [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | everything | free; Windows, Linux or macOS |
+| [Node.js 20+](https://nodejs.org/) | the web UI only | free; not needed for the console app or tests |
+
+## Quick start — the console app
 
 ```bash
 dotnet run --project src/RubiksCube.Cli
 ```
 
-This prints the solved cube, applies the verification sequence **F R' U B' L D'** (front cw, right ccw, up cw, back ccw, left cw, down ccw) and prints the resulting exploded view:
+This prints the solved cube, applies the verification sequence
+**F R' U B' L D'** (front clockwise, right anti-clockwise, up clockwise, back
+anti-clockwise, left clockwise, down anti-clockwise) and prints the resulting
+exploded view:
 
 ```
        R O G
@@ -24,7 +38,8 @@ B G O  W W W  O Y R  Y Y W
        R G G
 ```
 
-Any custom sequence and cube size also work:
+Letters are the sticker colours (White, Yellow, Green, Blue, Red, Orange), shown
+in colour on an interactive terminal. Any custom sequence and cube size work too:
 
 ```bash
 dotnet run --project src/RubiksCube.Cli -- "R U R' U'" --size 4
@@ -36,21 +51,65 @@ dotnet run --project src/RubiksCube.Cli -- "R U R' U'" --size 4
 dotnet test
 ```
 
-The suite covers every face rotation with hand-derived expected states, algebraic
+243 tests cover every face rotation with hand-derived expected states, algebraic
 properties (four quarter turns restore the cube, a move followed by its inverse
 restores the cube, scramble-and-undo round trips) across cube sizes 2–5, the
-notation parser, and the task's verification sequence sticker by sticker.
+notation parser, the REST API end to end, and the task's verification sequence
+sticker by sticker. The web app has its own suite:
+
+```bash
+cd apps/web
+npm ci
+npm run test
+```
+
+## The web UI
+
+An interactive 3D cube (drag to orbit) with animated face turns, the exploded
+view, a move pad for all eighteen face turns, free-text sequences, undo,
+scramble, reset and cube sizes from 2×2 to 5×5 — plus a button that runs the
+task's verification sequence move by move.
+
+```bash
+# 1. Build the UI into the API's wwwroot (first time only, or after UI changes)
+cd apps/web
+npm ci
+npm run build
+
+# 2. Serve API + UI together
+cd ../..
+dotnet run --project src/RubiksCube.Api
+```
+
+Then open **http://localhost:5180**. Interactive API documentation (Swagger) is
+at http://localhost:5180/swagger.
+
+For UI development with hot reload, run the API and `npm run dev` side by side —
+Vite proxies API calls to port 5180.
+
+## How it works
+
+The short version: rotations are computed geometrically rather than through
+hand-written sticker permutation tables. Every sticker maps to an exact integer
+position and face normal in cube space; turning a face is a 90° integer rotation
+of its outer layer; the spatial convention lives in one six-row table that can be
+checked against the exploded view. That is what makes any cube size work through
+a single code path — and what the 243 tests pin down from several independent
+directions.
+
+The long version, including the layering and the reasoning behind the design
+decisions, is in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ## Solution layout
 
 ```
 src/
-  RubiksCube.Domain/        Pure cube model — no external dependencies
-  RubiksCube.Application/   Use cases and rendering
-  RubiksCube.Api/           ASP.NET Core API (serves the web UI)
-  RubiksCube.Cli/           Console runner — prints the exploded view
+  RubiksCube.Domain/        The cube model — immutable, no external dependencies
+  RubiksCube.Application/   Sessions, use cases, ports, DTOs, net rendering
+  RubiksCube.Api/           ASP.NET Core REST API; serves the built web UI
+  RubiksCube.Cli/           Console runner printing the exploded view
+apps/
+  web/                      React + TypeScript + three.js web UI
 tests/
-  RubiksCube.Tests/         xUnit test suite
+  RubiksCube.Tests/         xUnit suite (domain, application, CLI, API)
 ```
-
-> A richer README with architecture notes and the interactive web UI is on its way.
