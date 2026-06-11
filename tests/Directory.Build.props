@@ -2,10 +2,11 @@
 
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)..'))" />
 
-  <!-- Test code does not require XML documentation; test names are the documentation. -->
+  <!-- Test code does not require XML documentation; test names are the documentation.
+       SA0001/SA1600/SA1602 follow from that choice; SA1515 fights table-style test data. -->
   <PropertyGroup>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);SA1600;SA1602;CS1591</NoWarn>
+    <NoWarn>$(NoWarn);SA0001;SA1600;SA1602;SA1515;CS1591</NoWarn>
   </PropertyGroup>
 
 </Project>
