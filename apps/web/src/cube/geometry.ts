@@ -131,6 +131,30 @@ export function scenePosition(
 }
 
 /**
+ * Whether dragging this sticker can produce any face turn at all. Stickers
+ * whose row and column are both inner slices (the centre of a 3×3 face, the
+ * inner 2×2 of a 5×5 face) have no outer layer to turn — grabbing them should
+ * fall through to orbiting instead.
+ *
+ * @param face The face of the sticker.
+ * @param grid The cubelet's grid coordinates.
+ * @param size The cube size.
+ */
+export function canDragSticker(
+  face: FaceName,
+  grid: [number, number, number],
+  size: number,
+): boolean {
+  const { rowDir, colDir } = FACE_BASES[face];
+  const m = size - 1;
+
+  const rowAxis = rowDir.findIndex((component) => component !== 0);
+  const colAxis = colDir.findIndex((component) => component !== 0);
+
+  return grid[rowAxis] === 0 || grid[rowAxis] === m || grid[colAxis] === 0 || grid[colAxis] === m;
+}
+
+/**
  * Resolves a drag gesture on a sticker into the face turn it asks for.
  *
  * Dragging along the grabbed face moves the row or column slice the sticker

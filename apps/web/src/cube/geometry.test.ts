@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CubeState, FaceName } from '../api/types';
-import { buildCubelets, resolveDragMove, rotationFor, scenePosition } from './geometry';
+import {
+  buildCubelets,
+  canDragSticker,
+  resolveDragMove,
+  rotationFor,
+  scenePosition,
+} from './geometry';
 
 /** A solved 3×3 in the API's shape: green front, red right, white up. */
 function solvedFaces(): Pick<CubeState, 'faces' | 'size'> {
@@ -110,6 +116,30 @@ describe('scenePosition', () => {
     expect(scenePosition([1, 1, 1], 3)).toEqual([0, 0, 0]);
     expect(scenePosition([2, 2, 2], 3)).toEqual([1, 1, 1]);
     expect(scenePosition([0, 0, 0], 2)).toEqual([-0.5, -0.5, -0.5]);
+  });
+});
+
+describe('canDragSticker', () => {
+  it('face centres on a 3x3 cannot start a turn', () => {
+    expect(canDragSticker('front', [1, 1, 2], 3)).toBe(false);
+    expect(canDragSticker('up', [1, 2, 1], 3)).toBe(false);
+  });
+
+  it('edges and corners can', () => {
+    expect(canDragSticker('front', [0, 1, 2], 3)).toBe(true);
+    expect(canDragSticker('front', [2, 2, 2], 3)).toBe(true);
+    expect(canDragSticker('up', [1, 2, 0], 3)).toBe(true);
+  });
+
+  it('every sticker of a 2x2 can — there are no inner slices', () => {
+    expect(canDragSticker('front', [0, 0, 1], 2)).toBe(true);
+    expect(canDragSticker('front', [1, 1, 1], 2)).toBe(true);
+  });
+
+  it('the inner block of a larger face cannot', () => {
+    expect(canDragSticker('front', [1, 2, 3], 4)).toBe(false);
+    expect(canDragSticker('front', [2, 1, 3], 4)).toBe(false);
+    expect(canDragSticker('front', [0, 2, 3], 4)).toBe(true);
   });
 });
 

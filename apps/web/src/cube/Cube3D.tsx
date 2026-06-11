@@ -18,6 +18,7 @@ import { STICKER_COLORS, colorOf } from './colors';
 import { formatMove } from './notation';
 import {
   buildCubelets,
+  canDragSticker,
   faceNormal,
   resolveDragMove,
   rotationFor,
@@ -68,14 +69,16 @@ interface CubeletMeshProps {
     cubelet: Cubelet,
     event: ThreeEvent<PointerEvent>,
   ) => void;
+  onStickerHover?: (draggable: boolean) => void;
 }
 
-function CubeletMesh({ cubelet, size, onStickerPointerDown }: CubeletMeshProps) {
+function CubeletMesh({ cubelet, size, onStickerPointerDown, onStickerHover }: CubeletMeshProps) {
   return (
     <group position={scenePosition(cubelet.grid, size)}>
       <mesh geometry={cubeletGeometry} material={bodyMaterial} />
       {Object.entries(cubelet.stickers).map(([face, letter]) => {
         const placement = STICKER_PLACEMENTS[face as FaceName];
+        const draggable = canDragSticker(face as FaceName, cubelet.grid, size);
         return (
           <mesh
             key={face}
@@ -84,9 +87,12 @@ function CubeletMesh({ cubelet, size, onStickerPointerDown }: CubeletMeshProps) 
             position={placement.position}
             rotation={placement.rotation}
             onPointerDown={
-              onStickerPointerDown &&
-              ((event) => onStickerPointerDown(face as FaceName, cubelet, event))
+              onStickerPointerDown && draggable
+                ? (event) => onStickerPointerDown(face as FaceName, cubelet, event)
+                : undefined
             }
+            onPointerOver={onStickerHover && (() => onStickerHover(draggable))}
+            onPointerOut={onStickerHover && (() => onStickerHover(false))}
           />
         );
       })}
@@ -121,9 +127,21 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
     plane: Plane;
   } | null>(null);
 
+  /** Cursor affordance: grab over draggable stickers, grabbing during a drag. */
+  const setCursor = (cursor: '' | 'grab' | 'grabbing') => {
+    getThree().gl.domElement.style.cursor = cursor;
+  };
+
+  const handleStickerHover = (draggable: boolean) => {
+    if (!dragRef.current) {
+      setCursor(draggable && onMove && !animation ? 'grab' : '');
+    }
+  };
+
   const beginDrag = (face: FaceName, cubelet: Cubelet, event: ThreeEvent<PointerEvent>) => {
     // Drags are resolved against the displayed state, so they only start
-    // while no turn is animating.
+    // while no turn is animating. Non-draggable stickers never reach here —
+    // grabbing them falls through to orbiting.
     if (!onMove || animation) {
       return;
     }
@@ -136,6 +154,7 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
       start,
       plane: new Plane().setFromNormalAndCoplanarPoint(new Vector3(...faceNormal(face)), start),
     };
+    setCursor('grabbing');
 
     // Orbiting pauses while the pointer is turning a layer.
     const controls = orbitControls();
@@ -153,6 +172,7 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
     const endDrag = () => {
       if (dragRef.current) {
         dragRef.current = null;
+        element.style.cursor = '';
         const controls = getThree().controls as unknown as { enabled: boolean } | null;
         if (controls) {
           controls.enabled = true;
@@ -273,6 +293,7 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
             cubelet={cubelet}
             size={state.size}
             onStickerPointerDown={beginDrag}
+            onStickerHover={handleStickerHover}
           />
         ))}
       </group>
@@ -282,6 +303,7 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
           cubelet={cubelet}
           size={state.size}
           onStickerPointerDown={beginDrag}
+          onStickerHover={handleStickerHover}
         />
       ))}
     </group>
