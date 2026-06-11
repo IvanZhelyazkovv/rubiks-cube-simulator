@@ -12,6 +12,12 @@ body,
   height: 100%;
 }
 
+/* Tailwind 4's preflight leaves buttons on the default cursor; clickable
+   things should look clickable. Disabled states keep their own cursor. */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
 body {
   margin: 0;
   font-family:
