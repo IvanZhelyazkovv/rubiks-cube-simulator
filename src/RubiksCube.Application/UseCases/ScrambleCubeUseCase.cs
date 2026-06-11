@@ -34,7 +34,10 @@ public sealed class ScrambleCubeUseCase(
             throw new InvalidScrambleLengthException(moveCount, MaxLength);
         }
 
-        var scramble = scrambleGenerator.Generate(moveCount);
+        // A session's cube size never changes, so reading it before the atomic
+        // update is safe; the scramble must know it to use every layer.
+        var size = repository.Get(id).Cube.Size;
+        var scramble = scrambleGenerator.Generate(moveCount, size);
         var session = repository.Update(id, current => current.Apply(scramble));
 
         return CubeStateMapper.ToDto(session);

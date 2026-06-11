@@ -110,6 +110,26 @@ public sealed class CubeUseCasesTests
         Assert.Equal(30, scrambled.History.Count);
     }
 
+    [Fact]
+    public void ScrambleCube_OnA4x4_DisturbsTheInnerCentres()
+    {
+        // Face turns alone can never move a 4×4's inner centre stickers; the
+        // scramble must reach them through slice moves.
+        var created = new CreateCubeUseCase(_repository).Execute(4);
+        var useCase = new ScrambleCubeUseCase(_repository, new ScrambleGenerator(seed: 5));
+
+        var scrambled = useCase.Execute(created.Id, 40);
+
+        var innerCentres = new[]
+        {
+            scrambled.Faces.Up[1][1],
+            scrambled.Faces.Up[1][2],
+            scrambled.Faces.Up[2][1],
+            scrambled.Faces.Up[2][2],
+        };
+        Assert.Contains(innerCentres, colour => colour != 'W');
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(201)]
