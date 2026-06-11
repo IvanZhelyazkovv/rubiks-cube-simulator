@@ -10,6 +10,9 @@ export default defineConfig({
   // CI runners render WebGL in software; give animated scenarios headroom.
   timeout: 60_000,
   fullyParallel: true,
+  // Each test runs a software-rendered WebGL scene; too many at once starve
+  // the animation frames the specs wait on.
+  workers: 3,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+﻿import { expect, test } from '@playwright/test';
 
 import { openApp } from './helpers';
 
@@ -18,6 +18,6 @@ test('the layout works on a phone: no horizontal overflow, touch moves apply', a
   await expect(page.getByTestId('net-view')).toBeVisible();
 
   // A tap on the move pad applies a turn.
-  await page.getByRole('button', { name: 'F', exact: true }).tap();
+  await page.getByRole('button', { name: 'F — clockwise', exact: true }).tap();
   await expect(page.getByText('1 move', { exact: true })).toBeVisible({ timeout: 10_000 });
 });

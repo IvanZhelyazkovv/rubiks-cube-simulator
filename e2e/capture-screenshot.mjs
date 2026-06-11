@@ -4,7 +4,7 @@
 import { chromium } from '@playwright/test';
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
+const page = await browser.newPage({ viewport: { width: 1440, height: 1080 } });
 
 await page.goto('http://localhost:5180/');
 await page.getByTestId('net-view').waitFor();

@@ -60,8 +60,8 @@ dotnet test
 The suite covers every face rotation with hand-derived expected states, algebraic
 properties (four quarter turns restore the cube, a move followed by its inverse
 restores the cube, scramble-and-undo round trips) across cube sizes 2–5, the
-notation parser, the REST API end to end, and the task's verification sequence
-sticker by sticker
+notation parser, the REST API through full in-process HTTP round trips, and the
+task's verification sequence sticker by sticker
 ([TaskScenarioTests](tests/RubiksCube.Tests/Application/TaskScenarioTests.cs) —
 the expectation is transcribed from the task sheet, independent of this code).
 The web app has its own suite:
@@ -87,12 +87,12 @@ npx playwright test                        # Playwright starts the API itself
 
 An interactive 3D cube with animated face turns: **drag a sticker to turn its
 layer** — middle layers included, which arrive as slice moves like `2L` — and
-drag the background to orbit. Alongside it: the exploded view, a move
-pad for all eighteen face turns, keyboard control (U D F B L R, Shift for
-counter-clockwise — turns queue while one animates), free-text sequences, undo,
-a rewind that replays the inverse of the whole history back to solved, scramble,
-reset and cube sizes from 2×2 to 5×5 — plus a button that runs the task's
-verification sequence move by move.
+drag the background to orbit. Alongside it: the exploded view, a move pad for
+all eighteen face turns and the cube's middle layers, keyboard control
+(U D F B L R, Shift for counter-clockwise — turns queue while one animates),
+free-text sequences, undo, a rewind that replays the inverse of the whole
+history back to solved, scramble, reset and cube sizes from 2×2 to 5×5 — plus
+a button that runs the task's verification sequence move by move.
 
 ```bash
 # 1. Build the UI into the API's wwwroot (first time only, or after UI changes)
