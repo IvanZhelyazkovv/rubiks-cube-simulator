@@ -18,6 +18,9 @@ dist/
 coverage/
 *.tsbuildinfo
 
+# Web UI production bundle (built into the API by `npm run build`)
+src/RubiksCube.Api/wwwroot/
+
 # Environment / local
 .env
 .env.local
