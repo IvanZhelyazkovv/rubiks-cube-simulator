@@ -2,23 +2,31 @@ import { expect, test } from '@playwright/test';
 
 import { openApp } from './helpers';
 
+// These specs verify move/undo/reset state handling, not animation playback
+// (the drag spec covers a real animated turn). Reduced motion keeps them
+// deterministic on machines that render WebGL in software.
+test.use({ contextOptions: { reducedMotion: 'reduce' } });
+
 test('keyboard turns apply and undo reverts them', async ({ page }) => {
   await openApp(page);
 
+  // Animated turns render in software on CI; every step gets headroom.
   await page.keyboard.press('f');
-  await expect(page.getByText('1 move', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 move', { exact: true })).toBeVisible({ timeout: 15_000 });
 
   await page.keyboard.press('Shift+R');
-  await expect(page.getByText('2 moves')).toBeVisible();
+  await expect(page.getByText('2 moves')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('history-panel').getByText("R'")).toBeVisible();
 
   const undo = page.getByRole('button', { name: 'Undo' });
+  await expect(undo).toBeEnabled({ timeout: 15_000 });
   await undo.click();
-  await expect(page.getByText('1 move', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 move', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(undo).toBeEnabled({ timeout: 15_000 });
   await undo.click();
 
-  await expect(page.getByText('0 moves')).toBeVisible();
-  await expect(page.getByTestId('solved-badge')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('0 moves')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('solved-badge')).toBeVisible({ timeout: 15_000 });
 });
 
 test('a typed sequence applies and reset restores the solved cube', async ({ page }) => {

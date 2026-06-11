@@ -2,6 +2,9 @@
 
 import { openApp } from './helpers';
 
+// Layout and touch handling are under test here, not animation playback.
+test.use({ contextOptions: { reducedMotion: 'reduce' } });
+
 test('the layout works on a phone: no horizontal overflow, touch moves apply', async ({
   page,
 }) => {

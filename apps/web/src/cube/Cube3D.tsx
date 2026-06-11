@@ -3,7 +3,6 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { ContactShadows, Environment, Lightformer, OrbitControls } from '@react-three/drei';
 import {
   Group,
-  MeshPhysicalMaterial,
   MeshStandardMaterial,
   NeutralToneMapping,
   Plane,
@@ -65,17 +64,18 @@ const bodyMaterial = new MeshStandardMaterial({
   roughness: 0.45,
   metalness: 0.05,
 });
-// Clearcoat reads as the glossy laminate of real stickers once the
-// environment map gives it something to reflect.
+// Low roughness plus the environment map reads as the glossy laminate of
+// real stickers. (Standard rather than physical/clearcoat material: the
+// clearcoat shader costs roughly double per frame, which software-GL
+// environments — CI, old machines — pay on every animation frame.)
 const stickerMaterials = new Map(
   Object.keys(STICKER_COLORS).map((letter) => [
     letter,
-    new MeshPhysicalMaterial({
+    new MeshStandardMaterial({
       color: colorOf(letter),
-      roughness: 0.28,
-      clearcoat: 0.9,
-      clearcoatRoughness: 0.18,
-      envMapIntensity: 0.85,
+      roughness: 0.25,
+      metalness: 0,
+      envMapIntensity: 1,
     }),
   ]),
 );
@@ -485,6 +485,8 @@ export function Cube3D({ state, animation, onAnimationComplete, onMove }: Cube3D
         onAnimationComplete={onAnimationComplete}
         onMove={onMove}
       />
+      {/* Baked once: the cube's blurred silhouette barely changes while a
+          layer turns, and re-rendering it every frame would tax weak GPUs. */}
       <ContactShadows
         position={[0, -2.4, 0]}
         opacity={0.45}
@@ -492,7 +494,7 @@ export function Cube3D({ state, animation, onAnimationComplete, onMove }: Cube3D
         blur={2.5}
         far={3.5}
         resolution={256}
-        frames={Infinity}
+        frames={1}
       />
       <OrbitControls enablePan={false} minDistance={5} maxDistance={14} makeDefault />
     </Canvas>

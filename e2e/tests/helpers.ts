@@ -35,4 +35,16 @@ export async function openApp(page: Page): Promise<void> {
   await page.goto('/');
   await expect(page.getByTestId('net-view')).toBeVisible();
   await expect(page.getByTestId('solved-badge')).toBeVisible();
+
+  // The 3D scene's first frame compiles every shader and bakes the
+  // environment map — on the software GL of a CI runner that can block the
+  // main thread for seconds. Two animation frames after the canvas appears
+  // means the scene has actually rendered and the app is interactive.
+  await page.locator('canvas').waitFor({ state: 'visible' });
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
 }
