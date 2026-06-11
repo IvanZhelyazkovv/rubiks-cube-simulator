@@ -34,9 +34,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'dotnet run --project ../src/RubiksCube.Api',
+    // Rebuild the UI first so local runs never test a stale bundle. CI builds
+    // the UI in its own step; the rebuild here is cheap and idempotent.
+    command: 'npm --prefix ../apps/web run build && dotnet run --project ../src/RubiksCube.Api',
     url: 'http://localhost:5180',
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 180_000,
   },
 });

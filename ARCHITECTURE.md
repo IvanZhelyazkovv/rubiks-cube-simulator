@@ -121,12 +121,15 @@ its tests cannot share a common mistake.
   the application's create-cube policy caps it at 10 to keep payloads and
   rendering sensible, and both entry points — API and console — share that one
   rule.
-- **Sessions are bounded and anonymous by design.** The in-memory store evicts
-  the least-recently-touched session beyond a fixed capacity, and the web UI
-  deletes a session it abandons, so the process cannot grow without limit. There
-  is no authentication: a session id is an unguessable GUID acting as a
-  capability, which is proportionate for an in-memory toy domain — any real
-  deployment would put per-user auth and quotas in front of it.
+- **Sessions are bounded and anonymous by design.** Every input has a policy
+  cap — cube size, scramble length and moves per request — and the in-memory
+  store evicts the least-recently-touched session beyond a fixed capacity. The
+  web UI deletes its session on a best-effort basis (when switching sizes and
+  on `pagehide` via a keepalive request); eviction covers whatever that misses,
+  so the process cannot grow without limit either way. There is no
+  authentication: a session id is an unguessable GUID acting as a capability,
+  which is proportionate for an in-memory toy domain — any real deployment
+  would put per-user auth and quotas in front of it.
 - **Undo and rewind fall out of the move algebra.** Every move knows its
   inverse, so undo applies the inverse of the last move and rewind replays the
   inverse of the whole history — no snapshots, no extra state, and the cube

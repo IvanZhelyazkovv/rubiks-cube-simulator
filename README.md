@@ -3,8 +3,8 @@
 [![CI](https://github.com/IvanZhelyazkovv/rubiks-cube-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/IvanZhelyazkovv/rubiks-cube-simulator/actions/workflows/ci.yml)
 
 A programmatic Rubik's cube that can correctly rotate any face — a pure .NET domain
-model behind a console runner, a REST API and an interactive 3D web UI. Supports any
-cube size from 2×2 up (3×3 by default). The cube starts solved and oriented as on
+model behind a console runner, a REST API and an interactive 3D web UI. Supports cube
+sizes from 2×2 to 10×10 (3×3 by default). The cube starts solved and oriented as on
 [rubiks-cube-solver.com](https://rubiks-cube-solver.com/): **green at the front, red
 on the right, white on top**.
 
@@ -59,7 +59,10 @@ The suite covers every face rotation with hand-derived expected states, algebrai
 properties (four quarter turns restore the cube, a move followed by its inverse
 restores the cube, scramble-and-undo round trips) across cube sizes 2–5, the
 notation parser, the REST API end to end, and the task's verification sequence
-sticker by sticker. The web app has its own suite:
+sticker by sticker
+([TaskScenarioTests](tests/RubiksCube.Tests/Application/TaskScenarioTests.cs) —
+the expectation is transcribed from the task sheet, independent of this code).
+The web app has its own suite:
 
 ```bash
 cd apps/web
@@ -78,12 +81,15 @@ npx playwright test                        # Playwright starts the API itself
 
 ## The web UI
 
-An interactive 3D cube (drag to orbit) with animated face turns, the exploded
-view, a move pad for all eighteen face turns, keyboard control (U D F B L R,
-Shift for counter-clockwise — turns queue while one animates), free-text
-sequences, undo, a rewind that replays the inverse of the whole history back to
-solved, scramble, reset and cube sizes from 2×2 to 5×5 — plus a button that runs
-the task's verification sequence move by move.
+![The web UI after running the verification sequence F R' U B' L D'](docs/web-ui.png)
+
+An interactive 3D cube with animated face turns: **drag a sticker to turn its
+layer**, drag the background to orbit. Alongside it: the exploded view, a move
+pad for all eighteen face turns, keyboard control (U D F B L R, Shift for
+counter-clockwise — turns queue while one animates), free-text sequences, undo,
+a rewind that replays the inverse of the whole history back to solved, scramble,
+reset and cube sizes from 2×2 to 5×5 — plus a button that runs the task's
+verification sequence move by move.
 
 ```bash
 # 1. Build the UI into the API's wwwroot (first time only, or after UI changes)
