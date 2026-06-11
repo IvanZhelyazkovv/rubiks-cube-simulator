@@ -65,22 +65,33 @@ export function Toolbar({
       <button type="button" onClick={onReset} disabled={busy} className={secondaryButton}>
         Reset
       </button>
-      <label className="ml-auto flex items-center gap-1.5 text-sm text-slate-400">
-        Size
-        <select
-          value={size}
-          onChange={(event) => onChangeSize(Number(event.target.value))}
-          disabled={busy}
-          className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-sm
-                     text-slate-100 focus:border-sky-500 focus:outline-none disabled:opacity-40"
+      <div className="ml-auto flex items-center gap-1.5 text-sm text-slate-400">
+        <span id="size-label">Size</span>
+        <div
+          role="group"
+          aria-labelledby="size-label"
+          className="flex overflow-hidden rounded-md border border-slate-600"
         >
           {SIZES.map((option) => (
-            <option key={option} value={option}>
+            <button
+              key={option}
+              type="button"
+              onClick={() => option !== size && onChangeSize(option)}
+              disabled={busy}
+              aria-pressed={option === size}
+              className={`px-2 py-1 text-sm font-medium transition focus-visible:outline-none
+                          disabled:cursor-not-allowed disabled:opacity-40
+                          ${
+                            option === size
+                              ? 'bg-sky-600 text-white'
+                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                          }`}
+            >
               {option}×{option}
-            </option>
+            </button>
           ))}
-        </select>
-      </label>
+        </div>
+      </div>
     </div>
   );
 }

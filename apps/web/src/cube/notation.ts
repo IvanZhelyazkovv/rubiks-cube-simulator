@@ -57,9 +57,10 @@ export function parseNotation(notation: string): ParseResult {
       }
 
       // Layer 1 is the face itself and is written without a prefix; two
-      // digits cover every supported cube size.
+      // digits cover every supported cube size, and a leading zero is not
+      // a spelling anyone intends.
       layer = Number(notation.slice(digitStart, position));
-      if (position - digitStart > 2 || layer < 2) {
+      if (position - digitStart > 2 || notation[digitStart] === '0' || layer < 2) {
         return {
           ok: false,
           position: digitStart,

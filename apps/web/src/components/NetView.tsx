@@ -2,6 +2,15 @@ import type { CubeState, FaceName } from '../api/types';
 import { COLOR_NAMES, colorOf } from '../cube/colors';
 import type { ColorLetter } from '../api/types';
 
+/** The colour's human name; like {@link colorOf}, loud about unknown letters. */
+function colorNameOf(letter: string): string {
+  const name = COLOR_NAMES[letter as ColorLetter] as string | undefined;
+  if (!name) {
+    throw new Error(`Unknown sticker letter '${letter}'.`);
+  }
+  return name;
+}
+
 interface FaceGridProps {
   face: FaceName;
   rows: string[];
@@ -10,22 +19,28 @@ interface FaceGridProps {
 function FaceGrid({ face, rows }: FaceGridProps) {
   return (
     <div
+      role="group"
       className="grid w-full gap-[2px]"
       style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(0, 1fr))` }}
       data-testid={`net-face-${face}`}
       aria-label={`${face} face`}
     >
       {rows.flatMap((row, rowIndex) =>
-        [...row].map((letter, columnIndex) => (
-          <div
-            key={`${rowIndex}-${columnIndex}`}
-            className="aspect-square rounded-[3px] border border-black/40"
-            style={{ backgroundColor: colorOf(letter) }}
-            data-testid={`net-${face}-${rowIndex}-${columnIndex}`}
-            data-letter={letter}
-            title={COLOR_NAMES[letter as ColorLetter]}
-          />
-        )),
+        [...row].map((letter, columnIndex) => {
+          const colorName = colorNameOf(letter);
+          return (
+            <div
+              key={`${rowIndex}-${columnIndex}`}
+              role="img"
+              className="aspect-square rounded-[3px] border border-black/40"
+              style={{ backgroundColor: colorOf(letter) }}
+              data-testid={`net-${face}-${rowIndex}-${columnIndex}`}
+              data-letter={letter}
+              aria-label={colorName}
+              title={colorName}
+            />
+          );
+        }),
       )}
     </div>
   );

@@ -21,7 +21,10 @@ export function useKeyboardMoves(onMove: (notation: string) => void): void {
         return;
       }
 
-      const letter = event.key.toUpperCase();
+      // event.code identifies the physical key, so the shortcuts keep working
+      // on non-Latin keyboard layouts; event.key covers remapped layouts.
+      const fromCode = event.code.startsWith('Key') ? event.code.slice(3) : '';
+      const letter = FACE_KEYS.has(fromCode) ? fromCode : event.key.toUpperCase();
       if (!FACE_KEYS.has(letter)) {
         return;
       }

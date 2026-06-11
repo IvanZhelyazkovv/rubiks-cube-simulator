@@ -4,13 +4,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { MovePad } from './MovePad';
 
+/** Finds a turn button by its token; the accessible name spells the turn out. */
+function turnButton(token: string) {
+  return screen.getByRole('button', { name: new RegExp(`^${token} — `) });
+}
+
 describe('MovePad', () => {
   it('offers all eighteen face turns', () => {
     render(<MovePad size={3} disabled={false} onMove={() => {}} />);
 
     for (const letter of ['U', 'D', 'F', 'B', 'L', 'R']) {
       for (const modifier of ['', "'", '2']) {
-        expect(screen.getByRole('button', { name: letter + modifier })).toBeInTheDocument();
+        expect(turnButton(letter + modifier)).toBeInTheDocument();
       }
     }
   });
@@ -19,19 +24,19 @@ describe('MovePad', () => {
     render(<MovePad size={3} disabled={false} onMove={() => {}} />);
 
     for (const slice of ['2L', "2L'", '2L2', '2D', '2F']) {
-      expect(screen.getByRole('button', { name: slice })).toBeInTheDocument();
+      expect(turnButton(slice)).toBeInTheDocument();
     }
   });
 
   it('offers every inner layer of a 4x4 and the middle of a 5x5', () => {
     const { rerender } = render(<MovePad size={4} disabled={false} onMove={() => {}} />);
     for (const slice of ['2U', '2D', '2F', '2B', '2L', '2R']) {
-      expect(screen.getByRole('button', { name: slice })).toBeInTheDocument();
+      expect(turnButton(slice)).toBeInTheDocument();
     }
 
     rerender(<MovePad size={5} disabled={false} onMove={() => {}} />);
-    expect(screen.getByRole('button', { name: '3L' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '2R' })).toBeInTheDocument();
+    expect(turnButton('3L')).toBeInTheDocument();
+    expect(turnButton('2R')).toBeInTheDocument();
   });
 
   it('hides the middle-layer section on a 2x2, which has none', () => {
@@ -45,8 +50,8 @@ describe('MovePad', () => {
     const onMove = vi.fn();
     render(<MovePad size={3} disabled={false} onMove={onMove} />);
 
-    await userEvent.click(screen.getByRole('button', { name: "R'" }));
-    await userEvent.click(screen.getByRole('button', { name: "2L'" }));
+    await userEvent.click(turnButton("R'"));
+    await userEvent.click(turnButton("2L'"));
 
     expect(onMove).toHaveBeenNthCalledWith(1, "R'");
     expect(onMove).toHaveBeenNthCalledWith(2, "2L'");

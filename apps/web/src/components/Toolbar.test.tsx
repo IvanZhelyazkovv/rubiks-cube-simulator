@@ -30,7 +30,7 @@ describe('Toolbar', () => {
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Rewind' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reset' })).toBeInTheDocument();
-    expect(screen.getByLabelText(/size/i)).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /size/i })).toBeInTheDocument();
   });
 
   it('fires the matching callback per button', async () => {
@@ -47,12 +47,22 @@ describe('Toolbar', () => {
     expect(props.onReset).toHaveBeenCalledTimes(1);
   });
 
-  it('reports a numeric size on selection', async () => {
+  it('reports a numeric size on selection and marks the active size', async () => {
     const props = renderToolbar();
 
-    await userEvent.selectOptions(screen.getByLabelText(/size/i), '4');
+    expect(screen.getByRole('button', { name: '3×3' })).toHaveAttribute('aria-pressed', 'true');
+
+    await userEvent.click(screen.getByRole('button', { name: '4×4' }));
 
     expect(props.onChangeSize).toHaveBeenCalledWith(4);
+  });
+
+  it('ignores a click on the size that is already active', async () => {
+    const props = renderToolbar();
+
+    await userEvent.click(screen.getByRole('button', { name: '3×3' }));
+
+    expect(props.onChangeSize).not.toHaveBeenCalled();
   });
 
   it('disables undo and rewind when there is no history', () => {
@@ -69,6 +79,5 @@ describe('Toolbar', () => {
     for (const button of screen.getAllByRole('button')) {
       expect(button).toBeDisabled();
     }
-    expect(screen.getByLabelText(/size/i)).toBeDisabled();
   });
 });

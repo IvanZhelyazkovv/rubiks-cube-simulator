@@ -68,7 +68,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByTestId('net-view');
 
-    await userEvent.click(screen.getByRole('button', { name: 'F' }));
+    await userEvent.click(screen.getByRole('button', { name: /^F — clockwise/ }));
 
     await waitFor(() => expect(client.applyMoves).toHaveBeenCalledWith('session-1', 'F'));
 

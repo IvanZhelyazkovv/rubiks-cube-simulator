@@ -98,6 +98,10 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
   const queueRef = useRef<Move[]>([]);
   const runTotals = useRef({ done: 0, total: 0 });
   const stateRef = useRef<CubeState | null>(null);
+  // Incremented when the session is replaced (size change). Async operations
+  // capture the epoch they started under and stop acting after any await that
+  // outlived it, so a late API response can never clobber the new session.
+  const epochRef = useRef(0);
 
   useEffect(() => {
     stateRef.current = state;
@@ -126,9 +130,13 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
     api
       .createCube(size)
       .then((created) => {
-        if (!cancelled) {
-          setState(created);
+        if (cancelled) {
+          // A duplicate dev-mode mount (StrictMode) or a quick size change
+          // raced this create; release the session it produced.
+          void api.deleteCube(created.id).catch(() => undefined);
+          return;
         }
+        setState(created);
       })
       .catch((createError: unknown) => {
         if (!cancelled) {
@@ -219,17 +227,31 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
         return;
       }
 
-      // A drain is already running — it will pick the new moves up,
-      // within the bounded queue.
+      // The same instant feedback invalid letters get: a layer that does not
+      // exist on this cube never reaches the server.
+      const cubeSize = stateRef.current?.size;
+      const badLayer = cubeSize
+        ? parsed.moves.find((move) => (move.layer ?? 1) >= cubeSize)
+        : undefined;
+      if (badLayer) {
+        setError(
+          `Layer ${badLayer.layer} does not exist on a ${cubeSize}×${cubeSize} cube; ` +
+            `layers run from 1 to ${(cubeSize ?? 0) - 1}.`,
+        );
+        return;
+      }
+
+      // A drain is already running — it picks the new moves up, as long as
+      // they fit the bounded queue. Nothing is ever truncated silently.
       if (drainingRef.current) {
-        const space = Math.max(0, MaxQueuedMoves - queueRef.current.length);
-        const appended = parsed.moves.slice(0, space);
-        if (appended.length === 0) {
+        const space = MaxQueuedMoves - queueRef.current.length;
+        if (parsed.moves.length > space) {
+          setError(`At most ${MaxQueuedMoves} moves can be queued per run.`);
           return;
         }
 
-        queueRef.current.push(...appended);
-        runTotals.current.total += appended.length;
+        queueRef.current.push(...parsed.moves);
+        runTotals.current.total += parsed.moves.length;
         setProgress({ ...runTotals.current });
         return;
       }
@@ -240,12 +262,18 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
         return;
       }
 
+      if (parsed.moves.length > MaxQueuedMoves) {
+        setError(`At most ${MaxQueuedMoves} moves can be queued per run.`);
+        return;
+      }
+
       // Stage the queue and flags before starting the drain — it reads the
       // queue synchronously. Rolled back below if `run` rejects the operation.
-      queueRef.current = parsed.moves.slice(0, MaxQueuedMoves);
+      queueRef.current = [...parsed.moves];
       runTotals.current = { done: 0, total: queueRef.current.length };
       drainingRef.current = true;
 
+      const epoch = epochRef.current;
       const accepted = run(async () => {
         try {
           let session = stateRef.current;
@@ -259,7 +287,13 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
             }
 
             const next = await api.applyMoves(session.id, formatMove(move));
+            if (epoch !== epochRef.current) {
+              return;
+            }
             await animateMove(move, next);
+            if (epoch !== epochRef.current) {
+              return;
+            }
 
             session = next;
             runTotals.current.done += 1;
@@ -284,74 +318,82 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
     [run, animateMove],
   );
 
-  const undo = useCallback(
-    () =>
-      run(async () => {
-        const session = stateRef.current;
-        if (!session || session.history.length === 0) {
-          return;
+  const undo = useCallback(() => {
+    const epoch = epochRef.current;
+    run(async () => {
+      const session = stateRef.current;
+      if (!session || session.history.length === 0) {
+        return;
+      }
+
+      const lastMove = parseNotation(session.history[session.history.length - 1]);
+      const next = await api.undoMove(session.id);
+      if (epoch !== epochRef.current) {
+        return;
+      }
+
+      if (lastMove.ok && lastMove.moves.length === 1) {
+        await animateMove(inverseOf(lastMove.moves[0]), next);
+      } else {
+        setState(next);
+      }
+    });
+  }, [run, animateMove]);
+
+  const rewind = useCallback(() => {
+    const epoch = epochRef.current;
+    run(async () => {
+      let session = stateRef.current;
+      runTotals.current = { done: 0, total: session?.history.length ?? 0 };
+
+      while (session && session.history.length > 0) {
+        if (runTotals.current.total > 1) {
+          setProgress({ ...runTotals.current });
         }
 
         const lastMove = parseNotation(session.history[session.history.length - 1]);
         const next = await api.undoMove(session.id);
+        if (epoch !== epochRef.current) {
+          return;
+        }
 
         if (lastMove.ok && lastMove.moves.length === 1) {
-          await animateMove(inverseOf(lastMove.moves[0]), next);
+          await animateMove(inverseOf(lastMove.moves[0]), next, REWIND_SPEED);
         } else {
           setState(next);
         }
-      }),
-    [run, animateMove],
-  );
 
-  const rewind = useCallback(
-    () =>
-      run(async () => {
-        let session = stateRef.current;
-        runTotals.current = { done: 0, total: session?.history.length ?? 0 };
+        session = next;
+        runTotals.current.done += 1;
+      }
+    });
+  }, [run, animateMove]);
 
-        while (session && session.history.length > 0) {
-          if (runTotals.current.total > 1) {
-            setProgress({ ...runTotals.current });
-          }
-
-          const lastMove = parseNotation(session.history[session.history.length - 1]);
-          const next = await api.undoMove(session.id);
-
-          if (lastMove.ok && lastMove.moves.length === 1) {
-            await animateMove(inverseOf(lastMove.moves[0]), next, REWIND_SPEED);
-          } else {
-            setState(next);
-          }
-
-          session = next;
-          runTotals.current.done += 1;
+  const reset = useCallback(() => {
+    const epoch = epochRef.current;
+    run(async () => {
+      const session = stateRef.current;
+      if (session) {
+        const next = await api.resetCube(session.id);
+        if (epoch === epochRef.current) {
+          setState(next);
         }
-      }),
-    [run, animateMove],
-  );
+      }
+    });
+  }, [run]);
 
-  const reset = useCallback(
-    () =>
-      run(async () => {
-        const session = stateRef.current;
-        if (session) {
-          setState(await api.resetCube(session.id));
+  const scramble = useCallback(() => {
+    const epoch = epochRef.current;
+    run(async () => {
+      const session = stateRef.current;
+      if (session) {
+        const next = await api.scrambleCube(session.id);
+        if (epoch === epochRef.current) {
+          setState(next);
         }
-      }),
-    [run],
-  );
-
-  const scramble = useCallback(
-    () =>
-      run(async () => {
-        const session = stateRef.current;
-        if (session) {
-          setState(await api.scrambleCube(session.id));
-        }
-      }),
-    [run],
-  );
+      }
+    });
+  }, [run]);
 
   const changeSize = useCallback(
     (newSize: number) => {
@@ -362,6 +404,7 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
         void api.deleteCube(previous.id).catch(() => undefined);
       }
 
+      epochRef.current += 1;
       queueRef.current = [];
       drainingRef.current = false;
       setQueueing(false);

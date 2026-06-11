@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import {
@@ -10,7 +10,7 @@ import {
   Vector2,
   Vector3,
 } from 'three';
-import { RoundedBoxGeometry } from 'three-stdlib';
+import { RoundedBoxGeometry, type OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 import type { CubeState, FaceName } from '../api/types';
 import type { PendingAnimation } from '../state/useCubeSession';
@@ -114,7 +114,10 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
   // Orbit controls are an external, mutable three.js object; fetching them
   // imperatively at event time keeps render-scope values immutable.
   const getThree = useThree((three) => three.get);
-  const orbitControls = () => getThree().controls as unknown as { enabled: boolean } | null;
+  const orbitControls = useCallback(
+    () => getThree().controls as OrbitControlsImpl | null,
+    [getThree],
+  );
 
   /** An in-progress sticker drag: where it started and the plane it moves in. */
   const dragRef = useRef<{
@@ -123,17 +126,45 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
     start: Vector3;
     plane: Plane;
   } | null>(null);
+  const hoveringSticker = useRef(false);
 
   /** Cursor affordance: grab over draggable stickers, grabbing during a drag. */
-  const setCursor = (cursor: '' | 'grab' | 'grabbing') => {
-    getThree().gl.domElement.style.cursor = cursor;
-  };
+  const setCursor = useCallback(
+    (cursor: '' | 'grab' | 'grabbing') => {
+      getThree().gl.domElement.style.cursor = cursor;
+    },
+    [getThree],
+  );
 
   const handleStickerHover = (hovering: boolean) => {
+    hoveringSticker.current = hovering;
     if (!dragRef.current) {
       setCursor(hovering && onMove && !animation ? 'grab' : '');
     }
   };
+
+  /** Abandons the current drag and restores orbiting. */
+  const cancelDrag = useCallback(() => {
+    if (dragRef.current) {
+      dragRef.current = null;
+      setCursor('');
+      const controls = orbitControls();
+      if (controls) {
+        controls.enabled = true;
+      }
+    }
+  }, [orbitControls, setCursor]);
+
+  // An animation starting mid-gesture invalidates the drag (it was aimed at
+  // the previous state); when it ends, refresh the hover cursor in place.
+  useEffect(() => {
+    if (animation) {
+      cancelDrag();
+    }
+    if (!dragRef.current) {
+      setCursor(hoveringSticker.current && onMove && !animation ? 'grab' : '');
+    }
+  }, [animation, onMove, cancelDrag, setCursor]);
 
   const beginDrag = (face: FaceName, cubelet: Cubelet, event: ThreeEvent<PointerEvent>) => {
     // Drags are resolved against the displayed state, so they only start
@@ -165,16 +196,7 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
     const pointer = new Vector2();
     const hit = new Vector3();
 
-    const endDrag = () => {
-      if (dragRef.current) {
-        dragRef.current = null;
-        element.style.cursor = '';
-        const controls = getThree().controls as unknown as { enabled: boolean } | null;
-        if (controls) {
-          controls.enabled = true;
-        }
-      }
-    };
+    const endDrag = cancelDrag;
 
     const handlePointerMove = (event: PointerEvent) => {
       const drag = dragRef.current;
@@ -211,16 +233,18 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
       }
     };
 
-    element.addEventListener('pointermove', handlePointerMove);
+    // The whole gesture lives on the window: a fast drag often leaves the
+    // canvas (especially on phones, where it is small) before resolving.
+    window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', endDrag);
     window.addEventListener('pointercancel', endDrag);
     return () => {
-      element.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', endDrag);
       window.removeEventListener('pointercancel', endDrag);
       endDrag();
     };
-  }, [gl, camera, getThree, onMove, state.size]);
+  }, [gl, camera, cancelDrag, onMove, state.size]);
 
   const cubelets = useMemo(() => buildCubelets(state), [state]);
   const rotation = useMemo(() => {

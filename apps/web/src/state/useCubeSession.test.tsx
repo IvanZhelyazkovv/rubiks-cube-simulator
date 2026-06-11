@@ -250,16 +250,50 @@ describe('useCubeSession', () => {
     await waitFor(() => expect(result.current.busy).toBe(false));
   });
 
-  it('caps the queue at fifty pending moves', async () => {
-    vi.mocked(client.applyMoves).mockResolvedValue(cubeState({ history: ['F'] }));
-
+  it('rejects a run of more than fifty moves instead of truncating it', async () => {
     const { result } = renderHook(() => useCubeSession());
     await waitFor(() => expect(result.current.state).not.toBeNull());
 
     act(() => result.current.applySequence(Array(60).fill('F').join(' ')));
 
-    await waitFor(() => expect(result.current.progress).not.toBeNull());
-    expect(result.current.progress?.total).toBe(50);
+    expect(result.current.error).toContain('At most 50 moves');
+    expect(result.current.busy).toBe(false);
+    expect(client.applyMoves).not.toHaveBeenCalled();
+  });
+
+  it('rejects a layer that does not exist on the current cube', async () => {
+    const { result } = renderHook(() => useCubeSession());
+    await waitFor(() => expect(result.current.state).not.toBeNull());
+
+    act(() => result.current.applySequence('3L'));
+
+    expect(result.current.error).toContain('Layer 3 does not exist on a 3×3 cube');
+    expect(client.applyMoves).not.toHaveBeenCalled();
+  });
+
+  it('a size change neutralizes an in-flight move from the old session', async () => {
+    let resolveMove: (value: CubeState) => void = () => {};
+    vi.mocked(client.applyMoves).mockImplementation(
+      () => new Promise<CubeState>((resolve) => (resolveMove = resolve)),
+    );
+    // First create (mount) yields the 3×3, the one after changeSize a 4×4.
+    vi.mocked(client.createCube).mockResolvedValueOnce(cubeState());
+    vi.mocked(client.createCube).mockResolvedValue(cubeState({ size: 4 }));
+
+    const { result } = renderHook(() => useCubeSession());
+    await waitFor(() => expect(result.current.state).not.toBeNull());
+
+    act(() => result.current.applySequence('F'));
+    act(() => result.current.changeSize(4));
+    await waitFor(() => expect(result.current.state?.size).toBe(4));
+
+    // The old session's response arrives late; it must not clobber anything.
+    act(() => resolveMove(cubeState({ isSolved: false, history: ['F'] })));
+    await waitFor(() => expect(result.current.busy).toBe(false));
+
+    expect(result.current.state?.size).toBe(4);
+    expect(result.current.state?.history).toEqual([]);
+    expect(result.current.animation).toBeNull();
   });
 
   it('scramble and reset reveal the new state without an animation', async () => {

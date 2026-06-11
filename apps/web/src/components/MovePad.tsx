@@ -1,31 +1,33 @@
 const FACE_LETTERS = ['U', 'D', 'F', 'B', 'L', 'R'] as const;
 const MODIFIERS = ['', "'", '2'] as const;
 
-/** The M/E/S names a cubist expects for the middle slices of a 3×3. */
-const CLASSIC_SLICE_NAMES: Record<string, string> = {
-  '2L': 'M slice',
-  '2D': 'E slice',
-  '2F': 'S slice',
+const MODIFIER_NAMES: Record<(typeof MODIFIERS)[number], string> = {
+  '': 'clockwise',
+  "'": 'counter-clockwise',
+  '2': 'half turn',
 };
 
 /**
  * The distinct inner slices of a cube, each named after its nearest face.
  * A dead-centre slice (odd cubes) is named after the conventional M/E/S
- * reference faces: left, down and front.
+ * reference faces — left, down and front — and labelled with the classic
+ * letter a cubist expects.
  */
-function sliceTokens(size: number): string[] {
-  const tokens: string[] = [];
+function sliceTokens(size: number): { token: string; classicName?: string }[] {
+  const tokens: { token: string; classicName?: string }[] = [];
   for (let layer = 2; layer <= Math.floor(size / 2); layer++) {
     for (const letter of FACE_LETTERS) {
-      tokens.push(`${layer}${letter}`);
+      tokens.push({ token: `${layer}${letter}` });
     }
   }
 
   if (size % 2 === 1) {
     const middle = (size + 1) / 2;
-    for (const letter of ['L', 'D', 'F']) {
-      tokens.push(`${middle}${letter}`);
-    }
+    tokens.push(
+      { token: `${middle}L`, classicName: 'M slice' },
+      { token: `${middle}D`, classicName: 'E slice' },
+      { token: `${middle}F`, classicName: 'S slice' },
+    );
   }
 
   return tokens;
@@ -33,17 +35,19 @@ function sliceTokens(size: number): string[] {
 
 interface TurnButtonProps {
   token: string;
+  modifier: (typeof MODIFIERS)[number];
   disabled: boolean;
   title?: string;
   onMove: (notation: string) => void;
 }
 
-function TurnButton({ token, disabled, title, onMove }: TurnButtonProps) {
+function TurnButton({ token, modifier, disabled, title, onMove }: TurnButtonProps) {
   return (
     <button
       type="button"
       disabled={disabled}
       title={title}
+      aria-label={`${token} — ${MODIFIER_NAMES[modifier]}`}
       onClick={() => onMove(token)}
       className="rounded-md bg-slate-700/70 px-2 py-2.5 font-mono text-sm font-semibold
                  text-slate-100 transition hover:bg-slate-600 active:scale-95
@@ -72,10 +76,15 @@ export function MovePad({ size, disabled, onMove }: MovePadProps) {
     <div data-testid="move-pad">
       <div className="grid grid-cols-3 gap-1.5">
         {FACE_LETTERS.flatMap((letter) =>
-          MODIFIERS.map((modifier) => {
-            const token = letter + modifier;
-            return <TurnButton key={token} token={token} disabled={disabled} onMove={onMove} />;
-          }),
+          MODIFIERS.map((modifier) => (
+            <TurnButton
+              key={letter + modifier}
+              token={letter + modifier}
+              modifier={modifier}
+              disabled={disabled}
+              onMove={onMove}
+            />
+          )),
         )}
       </div>
 
@@ -86,18 +95,16 @@ export function MovePad({ size, disabled, onMove }: MovePadProps) {
           </p>
           <div className="grid grid-cols-3 gap-1.5">
             {slices.flatMap((slice) =>
-              MODIFIERS.map((modifier) => {
-                const token = slice + modifier;
-                return (
-                  <TurnButton
-                    key={token}
-                    token={token}
-                    disabled={disabled}
-                    title={CLASSIC_SLICE_NAMES[slice]}
-                    onMove={onMove}
-                  />
-                );
-              }),
+              MODIFIERS.map((modifier) => (
+                <TurnButton
+                  key={slice.token + modifier}
+                  token={slice.token + modifier}
+                  modifier={modifier}
+                  disabled={disabled}
+                  title={slice.classicName}
+                  onMove={onMove}
+                />
+              )),
             )}
           </div>
         </>

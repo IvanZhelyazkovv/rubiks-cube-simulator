@@ -20,7 +20,7 @@ export default function App() {
   useKeyboardMoves(session.applySequence);
 
   return (
-    <div className="flex h-screen flex-col bg-slate-950 text-slate-100">
+    <div className="flex h-dvh flex-col bg-slate-950 text-slate-100">
       <header className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
         <div className="flex items-baseline gap-3">
           <h1 className="text-lg font-bold tracking-tight">Rubik's Cube Simulator</h1>
@@ -30,7 +30,11 @@ export default function App() {
         </div>
         <div className="flex items-center gap-3">
           {session.progress && (
-            <span className="text-xs text-slate-400 tabular-nums" data-testid="run-progress">
+            <span
+              className="text-xs text-slate-400 tabular-nums"
+              data-testid="run-progress"
+              role="status"
+            >
               applying {Math.min(session.progress.done + 1, session.progress.total)}/
               {session.progress.total}
             </span>
@@ -68,7 +72,7 @@ export default function App() {
 
       <main className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <section
-          className="h-[38vh] min-h-52 shrink-0 lg:h-auto lg:min-h-64 lg:flex-1"
+          className="h-[38dvh] min-h-52 shrink-0 lg:h-auto lg:min-h-64 lg:flex-1"
           aria-label="3D cube"
         >
           {session.state && (
@@ -116,7 +120,7 @@ export default function App() {
                   onMove={session.applySequence}
                 />
                 <p className="mt-1.5 text-xs text-slate-500">
-                  Tip: drag a sticker on the 3D cube to turn its row or column.
+                  Tip: drag a sticker on the 3D cube to turn its layer — middle layers too.
                   <span className="hidden sm:inline">
                     {' '}
                     Or press U, D, F, B, L or R — hold Shift for counter-clockwise. Turns queue up
@@ -140,7 +144,11 @@ export default function App() {
               />
             </>
           ) : (
-            !session.error && <p className="text-sm text-slate-500">Creating a cube…</p>
+            !session.error && (
+              <p className="text-sm text-slate-500" role="status">
+                Creating a cube…
+              </p>
+            )
           )}
         </aside>
       </main>
