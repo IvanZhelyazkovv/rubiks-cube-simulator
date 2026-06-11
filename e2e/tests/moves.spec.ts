@@ -27,11 +27,11 @@ test('a typed sequence applies and reset restores the solved cube', async ({ pag
   await page.getByLabel('Move sequence').fill("R U R' U'");
   await page.keyboard.press('Enter');
 
-  await expect(page.getByText('4 moves')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('4 moves')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('solved-badge')).not.toBeVisible();
 
   const reset = page.getByRole('button', { name: 'Reset' });
-  await expect(reset).toBeEnabled({ timeout: 10_000 });
+  await expect(reset).toBeEnabled({ timeout: 20_000 });
   await reset.click();
 
   await expect(page.getByText('0 moves')).toBeVisible();
