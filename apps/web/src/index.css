@@ -1,5 +1,11 @@
 @import 'tailwindcss';
 
+/* One focus treatment for every interactive element. */
+@utility focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70
+         focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950;
+}
+
 html,
 body,
 #root {
@@ -14,4 +20,20 @@ body {
     'Segoe UI',
     sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Default scrollbars break the dark theme on Windows. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(51 65 85 / 0.8) transparent;
+}
+
+kbd {
+  border: 1px solid var(--color-slate-700);
+  border-radius: 4px;
+  background: var(--color-slate-800);
+  padding: 1px 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-slate-300);
 }

@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { ContactShadows, Environment, Lightformer, OrbitControls } from '@react-three/drei';
 import {
   Group,
+  MeshPhysicalMaterial,
   MeshStandardMaterial,
+  NeutralToneMapping,
   Plane,
-  PlaneGeometry,
   Raycaster,
+  Shape,
+  ShapeGeometry,
   Vector2,
   Vector3,
+  type Mesh,
 } from 'three';
 import { RoundedBoxGeometry, type OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
@@ -26,20 +30,53 @@ import {
 } from './geometry';
 
 const STICKER_OFFSET = 0.501;
-const QUARTER_TURN_SECONDS = 0.28;
+const QUARTER_TURN_SECONDS = 0.32;
 
 /** How far (in scene units) a drag must travel before it counts as a turn. */
 const DRAG_THRESHOLD = 0.35;
 
+/** How far a grabbed sticker lifts off the cubelet, as tactile feedback. */
+const GRAB_LIFT = 0.012;
+
+const INTRO_SECONDS = 0.7;
+
+/** A flat square with rounded corners — the shape of a real cube sticker. */
+function roundedSquare(width: number, radius: number): Shape {
+  const half = width / 2;
+  const shape = new Shape();
+  shape.moveTo(-half + radius, -half);
+  shape.lineTo(half - radius, -half);
+  shape.quadraticCurveTo(half, -half, half, -half + radius);
+  shape.lineTo(half, half - radius);
+  shape.quadraticCurveTo(half, half, half - radius, half);
+  shape.lineTo(-half + radius, half);
+  shape.quadraticCurveTo(-half, half, -half, half - radius);
+  shape.lineTo(-half, -half + radius);
+  shape.quadraticCurveTo(-half, -half, -half + radius, -half);
+  return shape;
+}
+
 // Geometries and materials are shared across every cubelet and every render —
 // a 5×5 cube would otherwise create hundreds of identical GPU resources.
 const cubeletGeometry = new RoundedBoxGeometry(0.97, 0.97, 0.97, 4, 0.06);
-const stickerGeometry = new PlaneGeometry(0.86, 0.86);
-const bodyMaterial = new MeshStandardMaterial({ color: '#15151a', roughness: 0.85 });
+const stickerGeometry = new ShapeGeometry(roundedSquare(0.86, 0.09), 4);
+const bodyMaterial = new MeshStandardMaterial({
+  color: '#0d0d12',
+  roughness: 0.45,
+  metalness: 0.05,
+});
+// Clearcoat reads as the glossy laminate of real stickers once the
+// environment map gives it something to reflect.
 const stickerMaterials = new Map(
   Object.keys(STICKER_COLORS).map((letter) => [
     letter,
-    new MeshStandardMaterial({ color: colorOf(letter), roughness: 0.35 }),
+    new MeshPhysicalMaterial({
+      color: colorOf(letter),
+      roughness: 0.28,
+      clearcoat: 0.9,
+      clearcoatRoughness: 0.18,
+      envMapIntensity: 0.85,
+    }),
   ]),
 );
 
@@ -58,6 +95,27 @@ const STICKER_PLACEMENTS: Record<
 
 function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+/**
+ * Eases out with a slight overshoot, so a turn settles into place like a real
+ * cube clicking home. Restrained on purpose: the classic constant 1.70158 is
+ * far too bouncy for queued sequences.
+ */
+function easeOutBack(t: number): number {
+  const overshoot = 0.9;
+  return 1 + (overshoot + 1) * Math.pow(t - 1, 3) + overshoot * Math.pow(t - 1, 2);
+}
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
 }
 
 interface CubeletMeshProps {
@@ -125,6 +183,8 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
     cubelet: Cubelet;
     start: Vector3;
     plane: Plane;
+    mesh: Mesh;
+    meshRestPosition: Vector3;
   } | null>(null);
   const hoveringSticker = useRef(false);
 
@@ -143,17 +203,20 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
     }
   };
 
-  /** Abandons the current drag and restores orbiting. */
+  /** Abandons the current drag, settles the lifted sticker, restores orbiting. */
   const cancelDrag = useCallback(() => {
-    if (dragRef.current) {
+    const drag = dragRef.current;
+    if (drag) {
       dragRef.current = null;
+      drag.mesh.position.copy(drag.meshRestPosition);
+      invalidate();
       setCursor('');
       const controls = orbitControls();
       if (controls) {
         controls.enabled = true;
       }
     }
-  }, [orbitControls, setCursor]);
+  }, [orbitControls, setCursor, invalidate]);
 
   // An animation starting mid-gesture invalidates the drag (it was aimed at
   // the previous state); when it ends, refresh the hover cursor in place.
@@ -175,12 +238,20 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
 
     event.stopPropagation();
     const start = event.point.clone();
+    const normal = new Vector3(...faceNormal(face));
+    const mesh = event.object as Mesh;
     dragRef.current = {
       face,
       cubelet,
       start,
-      plane: new Plane().setFromNormalAndCoplanarPoint(new Vector3(...faceNormal(face)), start),
+      plane: new Plane().setFromNormalAndCoplanarPoint(normal, start),
+      mesh,
+      meshRestPosition: mesh.position.clone(),
     };
+
+    // Lift the grabbed sticker a hair so it visibly answers the grab.
+    mesh.position.addScaledVector(normal, GRAB_LIFT);
+    invalidate();
     setCursor('grabbing');
 
     // Orbiting pauses while the pointer is turning a layer.
@@ -258,6 +329,9 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
       angle,
       affects,
       duration: ((Math.abs(angle) / (Math.PI / 2)) * QUARTER_TURN_SECONDS) / animation.speed,
+      // A single turn settles with a slight overshoot, like a real cube
+      // clicking home; fast playback (rewind) keeps the calmer curve.
+      ease: animation.speed > 1 ? easeInOutCubic : easeOutBack,
     };
   }, [animation, state.size]);
 
@@ -282,7 +356,27 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
     }
   }, [animation, invalidate]);
 
+  // A one-shot mount flourish: the cube eases in from slightly small and
+  // turned, then the frameloop goes silent again. Never plays for users who
+  // prefer reduced motion.
+  const wholeGroup = useRef<Group>(null);
+  const introProgress = useRef(prefersReducedMotion() ? 1 : 0);
+
+  useEffect(() => {
+    // The on-demand frameloop needs a first frame for the intro (or, with
+    // reduced motion, for the initial still image).
+    invalidate();
+  }, [invalidate]);
+
   useFrame((_, delta) => {
+    if (introProgress.current < 1 && wholeGroup.current) {
+      introProgress.current = Math.min(1, introProgress.current + delta / INTRO_SECONDS);
+      const eased = easeOutCubic(introProgress.current);
+      wholeGroup.current.scale.setScalar((3 / state.size) * (0.9 + 0.1 * eased));
+      wholeGroup.current.rotation.y = -0.35 * (1 - eased);
+      invalidate();
+    }
+
     if (!rotation || finished.current || !rotatingGroup.current) {
       return;
     }
@@ -292,7 +386,7 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
     const frameDelta = Math.min(delta, 1 / 30);
     progress.current = Math.min(1, progress.current + frameDelta / rotation.duration);
 
-    const angle = easeInOutCubic(progress.current) * rotation.angle;
+    const angle = rotation.ease(progress.current) * rotation.angle;
     rotatingGroup.current.quaternion.setFromAxisAngle(rotation.axisVector, angle);
 
     if (progress.current >= 1) {
@@ -305,7 +399,7 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
 
   // Scaling by cube size keeps every size framed identically.
   return (
-    <group scale={3 / state.size}>
+    <group ref={wholeGroup} scale={3 / state.size}>
       <group ref={rotatingGroup}>
         {layers.rotating.map((cubelet) => (
           <CubeletMesh
@@ -347,15 +441,58 @@ export interface Cube3DProps {
  */
 export function Cube3D({ state, animation, onAnimationComplete, onMove }: Cube3DProps) {
   return (
-    <Canvas frameloop="demand" dpr={[1, 2]} camera={{ position: [4.4, 3.6, 5.6], fov: 42 }}>
-      <ambientLight intensity={1.1} />
-      <directionalLight position={[6, 10, 8]} intensity={1.4} />
-      <directionalLight position={[-6, -4, -8]} intensity={0.5} />
+    <Canvas
+      frameloop="demand"
+      dpr={[1, 2]}
+      camera={{ position: [5.8, 4.6, 7.3], fov: 32 }}
+      // The default filmic tone mapping desaturates the saturated sticker
+      // colours; neutral keeps them true to the scheme.
+      gl={{ toneMapping: NeutralToneMapping }}
+    >
+      {/* A studio rig of soft area lights, baked once into a local cubemap —
+          no network assets, and free after the single bake. */}
+      <Environment resolution={64} frames={1}>
+        <Lightformer
+          form="rect"
+          intensity={3}
+          position={[0, 6, 2]}
+          rotation-x={-Math.PI / 2}
+          scale={[10, 10, 1]}
+        />
+        <Lightformer
+          form="rect"
+          intensity={1.2}
+          color="#bcd6ff"
+          position={[-6, 1, 3]}
+          rotation-y={Math.PI / 2}
+          scale={[6, 4, 1]}
+        />
+        <Lightformer
+          form="rect"
+          intensity={1}
+          color="#ffe9c7"
+          position={[6, 0, -2]}
+          rotation-y={-Math.PI / 2}
+          scale={[6, 4, 1]}
+        />
+        <Lightformer form="rect" intensity={1.5} position={[0, 2, -8]} scale={[12, 2, 1]} />
+      </Environment>
+      <directionalLight position={[6, 10, 8]} intensity={1.0} />
+      <ambientLight intensity={0.3} />
       <Puzzle
         state={state}
         animation={animation}
         onAnimationComplete={onAnimationComplete}
         onMove={onMove}
+      />
+      <ContactShadows
+        position={[0, -2.4, 0]}
+        opacity={0.45}
+        scale={11}
+        blur={2.5}
+        far={3.5}
+        resolution={256}
+        frames={Infinity}
       />
       <OrbitControls enablePan={false} minDistance={5} maxDistance={14} makeDefault />
     </Canvas>

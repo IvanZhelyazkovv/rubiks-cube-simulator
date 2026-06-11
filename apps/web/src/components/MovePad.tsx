@@ -42,6 +42,7 @@ interface TurnButtonProps {
 }
 
 function TurnButton({ token, modifier, disabled, title, onMove }: TurnButtonProps) {
+  const base = modifier ? token.slice(0, -modifier.length) : token;
   return (
     <button
       type="button"
@@ -49,12 +50,29 @@ function TurnButton({ token, modifier, disabled, title, onMove }: TurnButtonProp
       title={title}
       aria-label={`${token} — ${MODIFIER_NAMES[modifier]}`}
       onClick={() => onMove(token)}
-      className="rounded-md bg-slate-700/70 px-2 py-2.5 font-mono text-sm font-semibold
-                 text-slate-100 transition hover:bg-slate-600 active:scale-95
+      className="focus-ring rounded-md border border-slate-700/80 bg-slate-800/70 px-2 py-2.5
+                 font-mono text-sm font-semibold text-slate-100 transition-colors duration-150
+                 hover:border-slate-600 hover:bg-slate-700 active:scale-95
                  disabled:cursor-not-allowed disabled:opacity-40 sm:py-1.5"
     >
-      {token}
+      {base}
+      {modifier && <span className="text-sky-300/90">{modifier}</span>}
     </button>
+  );
+}
+
+/** Labels the three columns of a turn grid: clockwise, counter, half. */
+function ColumnHeader() {
+  return (
+    <div
+      aria-hidden
+      className="mb-1 grid grid-cols-3 gap-1.5 text-center text-[10px] font-medium
+                 tracking-wider text-slate-500 uppercase"
+    >
+      <span>CW</span>
+      <span>CCW</span>
+      <span>180°</span>
+    </div>
   );
 }
 
@@ -74,6 +92,7 @@ export function MovePad({ size, disabled, onMove }: MovePadProps) {
 
   return (
     <div data-testid="move-pad">
+      <ColumnHeader />
       <div className="grid grid-cols-3 gap-1.5">
         {FACE_LETTERS.flatMap((letter) =>
           MODIFIERS.map((modifier) => (
