@@ -1,4 +1,4 @@
-﻿name: CI
+name: CI
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   backend:
-    name: Backend â€” build & test
+    name: Backend — build & test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -28,7 +28,7 @@ jobs:
         run: dotnet test --no-build --configuration Release
 
   contract:
-    name: Contract â€” schema drift gate
+    name: Contract — schema drift gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -59,7 +59,7 @@ jobs:
         run: git diff --exit-code -- apps/web/src/api/schema.d.ts
 
   web:
-    name: Web â€” lint, test & build
+    name: Web — lint, test & build
     runs-on: ubuntu-latest
     defaults:
       run:
