@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\src\RubiksCube.Domain\RubiksCube.Domain.csproj" />
     <ProjectReference Include="..\..\src\RubiksCube.Application\RubiksCube.Application.csproj" />
     <ProjectReference Include="..\..\src\RubiksCube.Api\RubiksCube.Api.csproj" />
+    <ProjectReference Include="..\..\src\RubiksCube.Cli\RubiksCube.Cli.csproj" />
   </ItemGroup>
 
 </Project>
