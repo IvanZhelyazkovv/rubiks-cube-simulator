@@ -23,7 +23,7 @@ public sealed class ScrambleCubeUseCase(
     /// <param name="id">The session identifier.</param>
     /// <param name="length">The number of random moves; <see cref="DefaultLength"/> when omitted.</param>
     /// <exception cref="CubeSessionNotFoundException">Thrown when no such session exists.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">
+    /// <exception cref="InvalidScrambleLengthException">
     /// Thrown when the length is outside [1, <see cref="MaxLength"/>].
     /// </exception>
     public CubeStateDto Execute(Guid id, int? length = null)
@@ -31,8 +31,7 @@ public sealed class ScrambleCubeUseCase(
         var moveCount = length ?? DefaultLength;
         if (moveCount is < 1 or > MaxLength)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(length), moveCount, $"Scramble length must be between 1 and {MaxLength}.");
+            throw new InvalidScrambleLengthException(moveCount, MaxLength);
         }
 
         var scramble = scrambleGenerator.Generate(moveCount);

@@ -9,27 +9,57 @@ namespace RubiksCube.Api.Infrastructure;
 /// records, so atomic updates reduce to compare-and-swap on the dictionary entry.
 /// </summary>
 /// <remarks>
+/// <para>
 /// This adapter lives in the API project on purpose: it is the composition root's
 /// only piece of infrastructure, and a dedicated Infrastructure project holding a
 /// single dictionary would be structure without substance. Extracting one becomes
 /// worthwhile the moment real persistence appears.
+/// </para>
+/// <para>
+/// The store is bounded: when adding a session would exceed the capacity, the
+/// least-recently-touched sessions are evicted. Abandoned cubes (closed browser
+/// tabs, crashed scripts) therefore cannot grow the process without limit.
+/// </para>
 /// </remarks>
 public sealed class InMemoryCubeSessionRepository : ICubeSessionRepository
 {
-    private readonly ConcurrentDictionary<Guid, CubeSession> _sessions = new();
+    private readonly ConcurrentDictionary<Guid, Entry> _sessions = new();
+    private readonly int _capacity;
+    private long _clock;
+
+    /// <summary>Creates a store holding at most <paramref name="capacity"/> sessions.</summary>
+    /// <param name="capacity">The maximum number of sessions kept before eviction.</param>
+    public InMemoryCubeSessionRepository(int capacity = 1000)
+    {
+        if (capacity < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(capacity), capacity, "Capacity must be at least 1.");
+        }
+
+        _capacity = capacity;
+    }
 
     /// <inheritdoc />
-    public CubeSession Get(Guid id) =>
-        _sessions.TryGetValue(id, out var session)
-            ? session
-            : throw new CubeSessionNotFoundException(id);
+    public CubeSession Get(Guid id)
+    {
+        if (!_sessions.TryGetValue(id, out var entry))
+        {
+            throw new CubeSessionNotFoundException(id);
+        }
+
+        Touch(id, entry);
+        return entry.Session;
+    }
 
     /// <inheritdoc />
     public void Add(CubeSession session)
     {
         ArgumentNullException.ThrowIfNull(session);
 
-        if (!_sessions.TryAdd(session.Id, session))
+        EvictLeastRecentlyTouchedWhileFull();
+
+        if (!_sessions.TryAdd(session.Id, NewEntry(session)))
         {
             throw new InvalidOperationException($"A session with id '{session.Id}' already exists.");
         }
@@ -47,10 +77,10 @@ public sealed class InMemoryCubeSessionRepository : ICubeSessionRepository
                 throw new CubeSessionNotFoundException(id);
             }
 
-            var updated = update(current);
+            var updated = NewEntry(update(current.Session));
             if (_sessions.TryUpdate(id, updated, current))
             {
-                return updated;
+                return updated.Session;
             }
 
             // Another request changed the session between read and write; retry on
@@ -60,4 +90,27 @@ public sealed class InMemoryCubeSessionRepository : ICubeSessionRepository
 
     /// <inheritdoc />
     public bool Delete(Guid id) => _sessions.TryRemove(id, out _);
+
+    private Entry NewEntry(CubeSession session) =>
+        new(session, Interlocked.Increment(ref _clock));
+
+    private void Touch(Guid id, Entry entry) =>
+        _sessions.TryUpdate(id, entry with { Touched = Interlocked.Increment(ref _clock) }, entry);
+
+    private void EvictLeastRecentlyTouchedWhileFull()
+    {
+        while (_sessions.Count >= _capacity)
+        {
+            var oldest = _sessions.MinBy(pair => pair.Value.Touched);
+            if (oldest.Key == Guid.Empty && oldest.Value is null)
+            {
+                return;
+            }
+
+            _sessions.TryRemove(oldest.Key, out _);
+        }
+    }
+
+    /// <summary>A stored session stamped with a logical last-touched time.</summary>
+    private sealed record Entry(CubeSession Session, long Touched);
 }

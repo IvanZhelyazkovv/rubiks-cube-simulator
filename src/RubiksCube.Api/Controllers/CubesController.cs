@@ -29,7 +29,7 @@ public sealed class CubesController(
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public ActionResult<CubeStateDto> Create([FromBody] CreateCubeRequest? request)
     {
-        var cube = createCube.Execute(request?.Size ?? 3);
+        var cube = createCube.Execute(request?.Size ?? CreateCubeUseCase.DefaultSize);
         return CreatedAtAction(nameof(Get), new { id = cube.Id }, cube);
     }
 

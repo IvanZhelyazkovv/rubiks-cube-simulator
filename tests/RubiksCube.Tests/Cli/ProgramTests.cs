@@ -3,10 +3,10 @@
 namespace RubiksCube.Tests.Cli;
 
 /// <summary>
-/// End-to-end tests of the console entry point. Output is captured through a
-/// redirected writer; the tests run sequentially within this class because the
-/// console is process-global state.
+/// End-to-end tests of the console entry point, with output captured through a
+/// redirected writer.
 /// </summary>
+[Collection(nameof(ConsoleSequentialCollection))]
 public sealed class ProgramTests : IDisposable
 {
     private readonly StringWriter _output = new();
@@ -89,6 +89,7 @@ public sealed class ProgramTests : IDisposable
     [InlineData("--size")]
     [InlineData("--size", "abc")]
     [InlineData("--size", "1")]
+    [InlineData("--size", "11")]
     [InlineData("--unknown")]
     public void Main_WithInvalidArguments_FailsWithUsage(params string[] args)
     {

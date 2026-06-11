@@ -11,6 +11,7 @@ namespace RubiksCube.Application.Scrambling;
 public sealed class ScrambleGenerator
 {
     private static readonly Face[] Faces = Enum.GetValues<Face>();
+    private static readonly RotationDirection[] Directions = Enum.GetValues<RotationDirection>();
 
     private readonly Random _random;
 
@@ -45,7 +46,7 @@ public sealed class ScrambleGenerator
             while (face == previousFace);
 
             previousFace = face;
-            moves.Add(new Move(face, (RotationDirection)_random.Next(3)));
+            moves.Add(new Move(face, Directions[_random.Next(Directions.Length)]));
         }
 
         return MoveSequence.Of(moves);

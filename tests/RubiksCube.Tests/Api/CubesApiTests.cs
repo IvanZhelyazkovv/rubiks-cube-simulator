@@ -126,6 +126,28 @@ public sealed class CubesApiTests : IClassFixture<WebApplicationFactory<Program>
     }
 
     [Fact]
+    public async Task CreateCube_WithoutBody_DefaultsToTheClassicCube()
+    {
+        var response = await _client.PostAsync("/api/cubes", content: null);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var cube = await response.Content.ReadFromJsonAsync<CubeStateDto>();
+        Assert.NotNull(cube);
+        Assert.Equal(3, cube.Size);
+    }
+
+    [Fact]
+    public async Task Scramble_WithExcessiveLength_ReturnsBadRequestProblem()
+    {
+        var created = await CreateCubeAsync();
+
+        var response = await _client.PostAsJsonAsync(
+            $"/api/cubes/{created.Id}/scramble", new { length = 9999 });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Scramble_AppliesRandomMoves()
     {
         var created = await CreateCubeAsync();

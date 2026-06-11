@@ -17,12 +17,15 @@ public sealed class DomainExceptionHandler(IProblemDetailsService problemDetails
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
+        // Only exceptions with deliberately client-safe messages are surfaced;
+        // anything else falls through to the framework's generic 500 handling.
         (int Status, string Title)? mapping = exception switch
         {
             CubeSessionNotFoundException => (StatusCodes.Status404NotFound, "Cube not found"),
             InvalidMoveNotationException => (StatusCodes.Status400BadRequest, "Invalid move notation"),
+            InvalidCubeSizeException => (StatusCodes.Status400BadRequest, "Invalid cube size"),
+            InvalidScrambleLengthException => (StatusCodes.Status400BadRequest, "Invalid scramble length"),
             EmptyMoveHistoryException => (StatusCodes.Status409Conflict, "Nothing to undo"),
-            ArgumentOutOfRangeException => (StatusCodes.Status400BadRequest, "Invalid argument"),
             _ => null,
         };
 

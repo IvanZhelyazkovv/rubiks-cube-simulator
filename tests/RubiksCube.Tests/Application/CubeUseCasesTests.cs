@@ -28,7 +28,10 @@ public sealed class CubeUseCasesTests
     [InlineData(11)]
     public void CreateCube_RejectsSizesOutsideThePolicyRange(int size)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new CreateCubeUseCase(_repository).Execute(size));
+        var exception = Assert.Throws<InvalidCubeSizeException>(
+            () => new CreateCubeUseCase(_repository).Execute(size));
+
+        Assert.Equal(size, exception.Size);
     }
 
     [Fact]
@@ -100,7 +103,7 @@ public sealed class CubeUseCasesTests
         var created = new CreateCubeUseCase(_repository).Execute();
         var useCase = new ScrambleCubeUseCase(_repository, new ScrambleGenerator(seed: 5));
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => useCase.Execute(created.Id, length));
+        Assert.Throws<InvalidScrambleLengthException>(() => useCase.Execute(created.Id, length));
     }
 
     [Fact]

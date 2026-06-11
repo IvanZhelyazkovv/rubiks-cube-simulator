@@ -15,7 +15,7 @@ builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 
 // Composition: the in-memory adapter satisfies the application's session port,
 // and the stateless use cases are registered as-is.
-builder.Services.AddSingleton<ICubeSessionRepository, InMemoryCubeSessionRepository>();
+builder.Services.AddSingleton<ICubeSessionRepository>(new InMemoryCubeSessionRepository(capacity: 1000));
 builder.Services.AddSingleton<ScrambleGenerator>();
 builder.Services.AddSingleton<CreateCubeUseCase>();
 builder.Services.AddSingleton<GetCubeUseCase>();
@@ -36,6 +36,11 @@ builder.Services.AddSwaggerGen(options =>
             options.IncludeXmlComments(path);
         }
     }
+
+    // Publish a contract as strict as the C# DTOs: non-nullable means required.
+    // The web client's TypeScript types are generated from this document.
+    options.SupportNonNullableReferenceTypes();
+    options.SchemaFilter<RequireNonNullablePropertiesSchemaFilter>();
 });
 
 // During development the web UI runs on Vite's dev server and calls this API

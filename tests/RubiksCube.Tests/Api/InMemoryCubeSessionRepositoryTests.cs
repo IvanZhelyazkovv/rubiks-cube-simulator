@@ -51,6 +51,29 @@ public sealed class InMemoryCubeSessionRepositoryTests
     }
 
     [Fact]
+    public void Add_EvictsTheLeastRecentlyTouchedSessionWhenFull()
+    {
+        var bounded = new InMemoryCubeSessionRepository(capacity: 2);
+        var first = CubeSession.CreateNew(3);
+        var second = CubeSession.CreateNew(3);
+        bounded.Add(first);
+        bounded.Add(second);
+
+        // Touch the older session so the other one becomes the eviction candidate.
+        bounded.Get(first.Id);
+        bounded.Add(CubeSession.CreateNew(3));
+
+        Assert.Equal(first, bounded.Get(first.Id));
+        Assert.Throws<CubeSessionNotFoundException>(() => bounded.Get(second.Id));
+    }
+
+    [Fact]
+    public void Constructor_RejectsNonPositiveCapacity()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new InMemoryCubeSessionRepository(0));
+    }
+
+    [Fact]
     public async Task Update_NeverLosesConcurrentUpdates()
     {
         var session = CubeSession.CreateNew(3);

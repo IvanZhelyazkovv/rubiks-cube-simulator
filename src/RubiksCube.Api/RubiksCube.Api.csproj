@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <!-- Compiler settings inherited from Directory.Build.props. -->
+
   <ItemGroup>
     <ProjectReference Include="..\RubiksCube.Application\RubiksCube.Application.csproj" />
   </ItemGroup>
@@ -7,11 +9,5 @@
   <ItemGroup>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.1" />
   </ItemGroup>
-
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
 
 </Project>

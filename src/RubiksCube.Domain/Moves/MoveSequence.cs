@@ -31,9 +31,10 @@ public sealed class MoveSequence : IReadOnlyList<Move>
         new([.. moves]);
 
     /// <summary>
-    /// Parses a whitespace-separated Singmaster notation string, e.g. <c>"F R' U2"</c>.
-    /// Face letters must be upper case; each may be followed by <c>'</c> (counter-clockwise)
-    /// or <c>2</c> (half turn).
+    /// Parses a Singmaster notation string, e.g. <c>"F R' U2"</c>. Face letters must be
+    /// upper case; each may be followed by <c>'</c> (counter-clockwise) or <c>2</c>
+    /// (half turn). Moves may be separated by whitespace or written compactly
+    /// (<c>"FR'U2"</c>).
     /// </summary>
     /// <param name="notation">The notation string to parse.</param>
     /// <exception cref="InvalidMoveNotationException">

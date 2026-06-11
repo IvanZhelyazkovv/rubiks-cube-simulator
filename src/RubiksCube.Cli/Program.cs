@@ -1,4 +1,5 @@
 using RubiksCube.Application.Rendering;
+using RubiksCube.Application.UseCases;
 using RubiksCube.Domain;
 using RubiksCube.Domain.Moves;
 
@@ -80,9 +81,10 @@ public static class Program
                     return false;
                 }
 
-                if (size < Cube.MinSize)
+                // The same size policy as the API — one rule for every entry point.
+                if (size is < Cube.MinSize or > CreateCubeUseCase.MaxSize)
                 {
-                    error = $"Cube size must be at least {Cube.MinSize}.";
+                    error = $"Cube size must be between {Cube.MinSize} and {CreateCubeUseCase.MaxSize}.";
                     return false;
                 }
 
