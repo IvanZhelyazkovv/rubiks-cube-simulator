@@ -64,6 +64,13 @@ orientation table matches the net, 90° integer rotation is exact, and the
 position mapping is a bijection. Nothing is special-cased per face or per size —
 NxN support falls out of the same code path.
 
+The approach pays off again for inner-slice turns (`2L` — the M slice of a
+3×3 — turns the second layer behind the left face): a slice is the same 90°
+rotation applied to a different plane along the axis, so the full slice family
+follows from parameterising the layer-selection predicate — no new permutation
+tables. Slices are pinned down by the classic whole-cube rotation identities
+(`R·M′·L′` must leave a solved cube solved, merely recoloured).
+
 ## Testing strategy
 
 The test suite (xUnit for .NET, Vitest for the web app) is layered to make a
@@ -74,6 +81,7 @@ rotation bug practically unable to hide:
 | Geometry | 90° rotations of basis vectors around every axis, hand-derived |
 | Single moves | The full expected state after each face turn on a solved cube — derived by hand from a physical cube, at sizes 3 and 4 |
 | Algebra | `X⁴ = identity`, `X·X′ = identity`, `X2 = X·X`, the sexy-move identity `(R U R′ U′)⁶ = identity`, scramble-and-undo round trips — across sizes 2–5 |
+| Slices | The whole-cube rotation identities `x = R·M′·L′`, `y = U·E′·D′`, `z = F·S·B′` leave a solved cube solved with its colours rotated; a 4×4 inner slice moves exactly its own columns |
 | Invariants | Colour counts never change; centre stickers never move on odd cubes |
 | Acceptance | The task's sequence `F R' U B' L D'` verified sticker by sticker against the expected result transcribed from the task sheet |
 | API | Full HTTP round trips through `WebApplicationFactory`, including error mapping and a 64-writer lost-update test on the session store |

@@ -54,12 +54,50 @@ public sealed class MoveSequenceTests
     [InlineData("F''", 2)]
     [InlineData("F2'", 2)]
     [InlineData("F R+ U", 3)]
+    [InlineData("1R", 0)] // layer 1 is the face itself, written without a prefix
+    [InlineData("0R", 0)]
+    [InlineData("123R", 0)] // more digits than any supported size needs
+    [InlineData("2", 0)] // a layer prefix with no face letter
+    [InlineData("2 L", 1)]
     public void Parse_ReportsThePositionOfInvalidNotation(string notation, int expectedPosition)
     {
         var exception = Assert.Throws<InvalidMoveNotationException>(() => MoveSequence.Parse(notation));
 
         Assert.Equal(expectedPosition, exception.Position);
         Assert.Equal(notation, exception.Notation);
+    }
+
+    [Fact]
+    public void Parse_ReadsLayerPrefixedSliceMoves()
+    {
+        var sequence = MoveSequence.Parse("2L 3R' 2F2");
+
+        Assert.Equal(
+            new[]
+            {
+                new Move(Face.Left, RotationDirection.Clockwise, Layer: 2),
+                new Move(Face.Right, RotationDirection.CounterClockwise, Layer: 3),
+                new Move(Face.Front, RotationDirection.HalfTurn, Layer: 2),
+            },
+            sequence);
+        Assert.Equal("2L 3R' 2F2", sequence.ToString());
+    }
+
+    [Fact]
+    public void Parse_InCompactFormADigitAfterAFaceBindsAsAHalfTurn()
+    {
+        // "2L2R" is 2L2 followed by R, not 2L followed by 2R.
+        var sequence = MoveSequence.Parse("2L2R");
+
+        Assert.Equal("2L2 R", sequence.ToString());
+    }
+
+    [Fact]
+    public void Inverse_PreservesTheLayerOfSliceMoves()
+    {
+        var sequence = MoveSequence.Parse("2L 3R");
+
+        Assert.Equal("3R' 2L'", sequence.Inverse().ToString());
     }
 
     [Fact]

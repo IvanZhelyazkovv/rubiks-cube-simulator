@@ -31,10 +31,12 @@ public sealed class MoveSequence : IReadOnlyList<Move>
         new([.. moves]);
 
     /// <summary>
-    /// Parses a Singmaster notation string, e.g. <c>"F R' U2"</c>. Face letters must be
-    /// upper case; each may be followed by <c>'</c> (counter-clockwise) or <c>2</c>
-    /// (half turn). Moves may be separated by whitespace or written compactly
-    /// (<c>"FR'U2"</c>).
+    /// Parses a Singmaster notation string, e.g. <c>"F R' U2 2L"</c>. Face letters must
+    /// be upper case; each may be prefixed by a layer number of 2 or more (<c>2L</c> is
+    /// the second layer from the left — the M slice of a 3×3) and followed by <c>'</c>
+    /// (counter-clockwise) or <c>2</c> (half turn). Moves may be separated by whitespace
+    /// or written compactly (<c>"FR'U2"</c>); in compact form a digit after a face
+    /// letter always binds to it as a half turn, so slice moves are best space-separated.
     /// </summary>
     /// <param name="notation">The notation string to parse.</param>
     /// <exception cref="InvalidMoveNotationException">
@@ -53,6 +55,30 @@ public sealed class MoveSequence : IReadOnlyList<Move>
             {
                 position++;
                 continue;
+            }
+
+            var layer = 1;
+            if (char.IsAsciiDigit(notation[position]))
+            {
+                var digitStart = position;
+                while (position < notation.Length && char.IsAsciiDigit(notation[position]))
+                {
+                    position++;
+                }
+
+                // Layer 1 is the face itself and is written without a prefix; two
+                // digits cover every supported cube size.
+                if (position - digitStart > 2
+                    || !int.TryParse(notation.AsSpan(digitStart, position - digitStart), out layer)
+                    || layer < 2)
+                {
+                    throw new InvalidMoveNotationException(notation, digitStart);
+                }
+            }
+
+            if (position >= notation.Length)
+            {
+                throw new InvalidMoveNotationException(notation, position - 1);
             }
 
             var face = notation[position] switch
@@ -84,7 +110,7 @@ public sealed class MoveSequence : IReadOnlyList<Move>
                 }
             }
 
-            moves.Add(new Move(face, direction));
+            moves.Add(new Move(face, direction, layer));
         }
 
         return new MoveSequence(moves.ToImmutable());

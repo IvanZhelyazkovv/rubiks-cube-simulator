@@ -3,10 +3,12 @@ import type { FaceName } from '../api/types';
 /** How far, and which way, a face is rotated — as seen looking at that face. */
 export type TurnDirection = 'clockwise' | 'counterClockwise' | 'half';
 
-/** A single face rotation. */
+/** A single layer rotation: a face turn, or a deeper slice when `layer` > 1. */
 export interface Move {
   face: FaceName;
   direction: TurnDirection;
+  /** The layer to turn, counted from `face`; 1 (the face itself) when omitted. */
+  layer?: number;
 }
 
 const FACE_BY_LETTER: Record<string, FaceName> = {
@@ -33,27 +35,46 @@ export type ParseResult =
   | { ok: false; position: number; message: string };
 
 /**
- * Parses Singmaster notation (`F`, `R'`, `U2`, separated by whitespace or compact).
- * Mirrors the server-side parser so input can be validated before it is sent.
+ * Parses Singmaster notation (`F`, `R'`, `U2`, slice moves like `2L`, separated
+ * by whitespace or compact). Mirrors the server-side parser so input can be
+ * validated before it is sent.
  */
 export function parseNotation(notation: string): ParseResult {
   const moves: Move[] = [];
   let position = 0;
 
   while (position < notation.length) {
-    const letter = notation[position];
-
-    if (/\s/.test(letter)) {
+    if (/\s/.test(notation[position])) {
       position += 1;
       continue;
     }
 
-    const face = FACE_BY_LETTER[letter];
+    let layer = 1;
+    if (/[0-9]/.test(notation[position])) {
+      const digitStart = position;
+      while (position < notation.length && /[0-9]/.test(notation[position])) {
+        position += 1;
+      }
+
+      // Layer 1 is the face itself and is written without a prefix; two
+      // digits cover every supported cube size.
+      layer = Number(notation.slice(digitStart, position));
+      if (position - digitStart > 2 || layer < 2) {
+        return {
+          ok: false,
+          position: digitStart,
+          message: `Invalid layer at position ${digitStart + 1} — slice moves use 2 or higher, like 2L.`,
+        };
+      }
+    }
+
+    const letter = notation[position];
+    const face = letter ? FACE_BY_LETTER[letter] : undefined;
     if (!face) {
       return {
         ok: false,
         position,
-        message: `Unexpected '${letter}' at position ${position + 1} — expected U, D, F, B, L or R.`,
+        message: `Unexpected '${letter ?? 'end of input'}' at position ${position + 1} — expected U, D, F, B, L or R.`,
       };
     }
 
@@ -67,17 +88,18 @@ export function parseNotation(notation: string): ParseResult {
       position += 1;
     }
 
-    moves.push({ face, direction });
+    moves.push(layer > 1 ? { face, direction, layer } : { face, direction });
   }
 
   return { ok: true, moves };
 }
 
-/** Formats a move in Singmaster notation, e.g. `F`, `R'` or `U2`. */
+/** Formats a move in Singmaster notation, e.g. `F`, `R'`, `U2` or `2L'`. */
 export function formatMove(move: Move): string {
   const modifier =
     move.direction === 'counterClockwise' ? "'" : move.direction === 'half' ? '2' : '';
-  return LETTER_BY_FACE[move.face] + modifier;
+  const prefix = move.layer && move.layer > 1 ? String(move.layer) : '';
+  return prefix + LETTER_BY_FACE[move.face] + modifier;
 }
 
 /** Returns the move that undoes the given one. */

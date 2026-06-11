@@ -43,10 +43,12 @@ B G O  W W W  O Y R  Y Y W
 ```
 
 Letters are the sticker colours (White, Yellow, Green, Blue, Red, Orange), shown
-in colour on an interactive terminal. Any custom sequence and cube size work too:
+in colour on an interactive terminal. Any custom sequence and cube size work too,
+including inner-slice turns written with a layer prefix (`2L` is the second layer
+from the left — the classic M slice on a 3×3):
 
 ```bash
-dotnet run --project src/RubiksCube.Cli -- "R U R' U'" --size 4
+dotnet run --project src/RubiksCube.Cli -- "R U R' U' 2R" --size 4
 ```
 
 ## Tests
@@ -84,7 +86,8 @@ npx playwright test                        # Playwright starts the API itself
 ![The web UI after running the verification sequence F R' U B' L D'](docs/web-ui.png)
 
 An interactive 3D cube with animated face turns: **drag a sticker to turn its
-layer**, drag the background to orbit. Alongside it: the exploded view, a move
+layer** — middle layers included, which arrive as slice moves like `2L` — and
+drag the background to orbit. Alongside it: the exploded view, a move
 pad for all eighteen face turns, keyboard control (U D F B L R, Shift for
 counter-clockwise — turns queue while one animates), free-text sequences, undo,
 a rewind that replays the inverse of the whole history back to solved, scramble,

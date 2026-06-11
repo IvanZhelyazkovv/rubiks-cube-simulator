@@ -94,20 +94,13 @@ export interface MoveRotation {
 /** Returns the axis, angle and layer of the 3D rotation performed by a move. */
 export function rotationFor(move: Move, size: number): MoveRotation {
   const m = size - 1;
+  const normal = FACE_BASES[move.face].normal;
+  const axisIndex = normal.findIndex((component) => component !== 0);
 
-  const faceGeometry: Record<
-    FaceName,
-    { axis: [number, number, number]; inLayer: (g: [number, number, number]) => boolean }
-  > = {
-    up: { axis: [0, 1, 0], inLayer: ([, y]) => y === m },
-    down: { axis: [0, -1, 0], inLayer: ([, y]) => y === 0 },
-    front: { axis: [0, 0, 1], inLayer: ([, , z]) => z === m },
-    back: { axis: [0, 0, -1], inLayer: ([, , z]) => z === 0 },
-    left: { axis: [-1, 0, 0], inLayer: ([x]) => x === 0 },
-    right: { axis: [1, 0, 0], inLayer: ([x]) => x === m },
-  };
-
-  const { axis, inLayer } = faceGeometry[move.face];
+  // Layer k counts inwards from the face: grid coordinate m − (k − 1) when the
+  // face sits at the positive end of its axis, k − 1 at the negative end.
+  const layer = move.layer ?? 1;
+  const layerCoordinate = normal[axisIndex] > 0 ? m - (layer - 1) : layer - 1;
 
   // Clockwise as seen from outside the face is a negative (right-handed)
   // rotation around its outward axis — the same convention as the server.
@@ -118,7 +111,11 @@ export function rotationFor(move: Move, size: number): MoveRotation {
         ? Math.PI / 2
         : -Math.PI;
 
-  return { axis, angle, affects: inLayer };
+  return {
+    axis: [...normal] as [number, number, number],
+    angle,
+    affects: (grid) => grid[axisIndex] === layerCoordinate,
+  };
 }
 
 /** Maps grid coordinates to the cubelet's centre position in scene units. */
@@ -130,39 +127,23 @@ export function scenePosition(
   return [grid[0] - offset, grid[1] - offset, grid[2] - offset];
 }
 
-/**
- * Whether dragging this sticker can produce any face turn at all. Stickers
- * whose row and column are both inner slices (the centre of a 3×3 face, the
- * inner 2×2 of a 5×5 face) have no outer layer to turn — grabbing them should
- * fall through to orbiting instead.
- *
- * @param face The face of the sticker.
- * @param grid The cubelet's grid coordinates.
- * @param size The cube size.
- */
-export function canDragSticker(
-  face: FaceName,
-  grid: [number, number, number],
-  size: number,
-): boolean {
-  const { rowDir, colDir } = FACE_BASES[face];
-  const m = size - 1;
-
-  const rowAxis = rowDir.findIndex((component) => component !== 0);
-  const colAxis = colDir.findIndex((component) => component !== 0);
-
-  return grid[rowAxis] === 0 || grid[rowAxis] === m || grid[colAxis] === 0 || grid[colAxis] === m;
+/** The face whose outward normal points along the given signed axis. */
+function faceAlong(axisIndex: number, sign: 1 | -1): FaceName {
+  return (Object.keys(FACE_BASES) as FaceName[]).find(
+    (candidate) => FACE_BASES[candidate].normal[axisIndex] === sign,
+  )!;
 }
 
 /**
- * Resolves a drag gesture on a sticker into the face turn it asks for.
+ * Resolves a drag gesture on a sticker into the layer turn it asks for.
  *
  * Dragging along the grabbed face moves the row or column slice the sticker
- * belongs to. Only the outermost layers correspond to face turns in this
- * domain, so a drag on a middle slice (e.g. the centre column of a 3×3)
- * resolves to nothing.
+ * belongs to: outer layers turn as face moves, inner ones as slice moves
+ * (`2L` — the M slice of a 3×3 — when the centre column is dragged). The
+ * slice is named after its nearest face; a dead-centre slice ties to the
+ * conventional M/E/S reference faces (left, down, front).
  *
- * The turn's direction follows from physics: a clockwise turn of face `f`
+ * The turn's direction follows from physics: a clockwise turn about face `f`
  * (seen from outside) moves a sticker at position `p` with velocity
  * `(−n_f) × p`. Whichever sign of the turn moves the sticker along the drag is
  * the turn the user asked for.
@@ -171,7 +152,7 @@ export function canDragSticker(
  * @param grid The grabbed cubelet's grid coordinates.
  * @param drag The drag vector in scene axes (any magnitude; only direction matters).
  * @param size The cube size.
- * @returns The requested move, or null when the drag does not map to a face turn.
+ * @returns The requested move, or null when the drag does not map to a turn.
  */
 export function resolveDragMove(
   face: FaceName,
@@ -192,22 +173,17 @@ export function resolveDragMove(
   // along the row axis), and vice versa.
   const sliceAxis = Math.abs(alongColumn) >= Math.abs(alongRow) ? rowDir : colDir;
   const axisIndex = sliceAxis.findIndex((component) => component !== 0);
-  const layer = grid[axisIndex];
+  const coordinate = grid[axisIndex];
 
-  let moveFace: FaceName | null = null;
-  if (layer === m || layer === 0) {
-    const outwardSign = layer === m ? 1 : -1;
-    const normal: Vec3 = [0, 0, 0].map((_, index) =>
-      index === axisIndex ? outwardSign : 0,
-    ) as unknown as Vec3;
-    moveFace = (Object.keys(FACE_BASES) as FaceName[]).find(
-      (candidate) => dot(FACE_BASES[candidate].normal, normal) === 1,
-    )!;
-  }
-
-  if (!moveFace) {
-    return null;
-  }
+  // Name the slice after its nearest face; the z axis breaks dead-centre ties
+  // towards the positive face so the conventions match M (left), E (down)
+  // and S (front).
+  const fromPositive = m - coordinate;
+  const fromNegative = coordinate;
+  const usePositiveFace =
+    fromPositive < fromNegative || (fromPositive === fromNegative && axisIndex === 2);
+  const moveFace = faceAlong(axisIndex, usePositiveFace ? 1 : -1);
+  const layer = (usePositiveFace ? fromPositive : fromNegative) + 1;
 
   const position = scenePosition(grid, size);
   const clockwiseVelocity = cross(negate(FACE_BASES[moveFace].normal), position);
@@ -217,5 +193,5 @@ export function resolveDragMove(
   }
 
   const direction: TurnDirection = alignment > 0 ? 'clockwise' : 'counterClockwise';
-  return { face: moveFace, direction };
+  return layer > 1 ? { face: moveFace, direction, layer } : { face: moveFace, direction };
 }

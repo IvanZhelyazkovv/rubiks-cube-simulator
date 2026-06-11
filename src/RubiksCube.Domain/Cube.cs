@@ -14,9 +14,10 @@ namespace RubiksCube.Domain;
 /// Rotations are computed geometrically rather than through hand-written sticker
 /// permutation tables. Every sticker is identified by an exact integer position in
 /// cube space together with the outward normal of the face it sits on
-/// (see <see cref="FaceOrientation"/>). Turning a face rotates the positions and
-/// normals of every sticker in that face's outer layer by 90° around the face axis,
-/// and the results are mapped back to grid coordinates.
+/// (see <see cref="FaceOrientation"/>). Turning a layer rotates the positions and
+/// normals of every sticker in that layer by 90° around the face axis, and the
+/// results are mapped back to grid coordinates. Inner-slice turns (<c>2L</c>, the
+/// M slice) are the same rotation applied to a different plane along the axis.
 /// </para>
 /// <para>
 /// This makes correctness reviewable in one place: if the six face orientations match
@@ -124,16 +125,24 @@ public sealed class Cube : IEquatable<Cube>
     }
 
     /// <summary>Returns a new cube with the given <paramref name="move"/> applied.</summary>
-    /// <param name="move">The face rotation to apply.</param>
+    /// <param name="move">The layer rotation to apply.</param>
+    /// <exception cref="InvalidLayerException">
+    /// Thrown when the move's layer does not exist on a cube of this size.
+    /// </exception>
     public Cube Apply(Move move)
     {
+        if (move.Layer < 1 || move.Layer >= Size)
+        {
+            throw new InvalidLayerException(move.Layer, Size);
+        }
+
         var result = this;
         var clockwise = move.Direction != RotationDirection.CounterClockwise;
         var turns = move.Direction == RotationDirection.HalfTurn ? 2 : 1;
 
         for (var turn = 0; turn < turns; turn++)
         {
-            result = result.ApplyQuarterTurn(move.Face, clockwise);
+            result = result.ApplyQuarterTurn(move.Face, clockwise, move.Layer);
         }
 
         return result;
@@ -196,12 +205,17 @@ public sealed class Cube : IEquatable<Cube>
     private static Vector3Int Rotate(Vector3Int vector, Vector3Int axis, bool clockwise) =>
         clockwise ? vector.RotateClockwiseAround(axis) : vector.RotateCounterClockwiseAround(axis);
 
-    private Cube ApplyQuarterTurn(Face face, bool clockwise)
+    private Cube ApplyQuarterTurn(Face face, bool clockwise, int layer)
     {
         // "Clockwise" is as seen looking at the face from outside the cube —
         // that is, from the tip of its outward normal.
         var axis = FaceOrientation.Of(face).Normal;
         var rotated = _stickers.ToArray();
+
+        // Layer k sits at N + 1 − 2k along the axis: the outer ring (k = 1) at
+        // N − 1, the next slice at N − 3, and so on. The face's own stickers
+        // (dot = N) turn only with the outer layer.
+        var layerCoordinate = Size + 1 - (2 * layer);
 
         foreach (var sourceFace in Faces)
         {
@@ -212,9 +226,9 @@ public sealed class Cube : IEquatable<Cube>
                 {
                     var position = PositionOf(orientation, row, column);
 
-                    // The turning layer is the face itself (dot = N) plus the ring of
-                    // stickers on adjacent faces nearest to it (dot = N - 1).
-                    if (position.Dot(axis) < Size - 1)
+                    var dot = position.Dot(axis);
+                    var inLayer = layer == 1 ? dot >= Size - 1 : dot == layerCoordinate;
+                    if (!inLayer)
                     {
                         continue;
                     }

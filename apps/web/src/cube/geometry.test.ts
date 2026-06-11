@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CubeState, FaceName } from '../api/types';
-import {
-  buildCubelets,
-  canDragSticker,
-  resolveDragMove,
-  rotationFor,
-  scenePosition,
-} from './geometry';
+import { buildCubelets, resolveDragMove, rotationFor, scenePosition } from './geometry';
 
 /** A solved 3×3 in the API's shape: green front, red right, white up. */
 function solvedFaces(): Pick<CubeState, 'faces' | 'size'> {
@@ -108,6 +102,19 @@ describe('rotationFor', () => {
     expect(ccw.angle).toBeCloseTo(Math.PI / 2);
     expect(half.angle).toBeCloseTo(-Math.PI);
   });
+
+  it('selects inner slices by layer, counted from the named face', () => {
+    // 2L on a 3×3 is the middle column (grid x = 1).
+    const middle = rotationFor({ face: 'left', direction: 'clockwise', layer: 2 }, 3);
+    expect(middle.affects([1, 0, 0])).toBe(true);
+    expect(middle.affects([0, 0, 0])).toBe(false);
+    expect(middle.affects([2, 0, 0])).toBe(false);
+
+    // 2R on a 4×4 is the second column from the right (grid x = 2).
+    const inner = rotationFor({ face: 'right', direction: 'clockwise', layer: 2 }, 4);
+    expect(inner.affects([2, 0, 0])).toBe(true);
+    expect(inner.affects([3, 0, 0])).toBe(false);
+  });
 });
 
 describe('scenePosition', () => {
@@ -116,30 +123,6 @@ describe('scenePosition', () => {
     expect(scenePosition([1, 1, 1], 3)).toEqual([0, 0, 0]);
     expect(scenePosition([2, 2, 2], 3)).toEqual([1, 1, 1]);
     expect(scenePosition([0, 0, 0], 2)).toEqual([-0.5, -0.5, -0.5]);
-  });
-});
-
-describe('canDragSticker', () => {
-  it('face centres on a 3x3 cannot start a turn', () => {
-    expect(canDragSticker('front', [1, 1, 2], 3)).toBe(false);
-    expect(canDragSticker('up', [1, 2, 1], 3)).toBe(false);
-  });
-
-  it('edges and corners can', () => {
-    expect(canDragSticker('front', [0, 1, 2], 3)).toBe(true);
-    expect(canDragSticker('front', [2, 2, 2], 3)).toBe(true);
-    expect(canDragSticker('up', [1, 2, 0], 3)).toBe(true);
-  });
-
-  it('every sticker of a 2x2 can — there are no inner slices', () => {
-    expect(canDragSticker('front', [0, 0, 1], 2)).toBe(true);
-    expect(canDragSticker('front', [1, 1, 1], 2)).toBe(true);
-  });
-
-  it('the inner block of a larger face cannot', () => {
-    expect(canDragSticker('front', [1, 2, 3], 4)).toBe(false);
-    expect(canDragSticker('front', [2, 1, 3], 4)).toBe(false);
-    expect(canDragSticker('front', [0, 2, 3], 4)).toBe(true);
   });
 });
 
@@ -179,20 +162,44 @@ describe('resolveDragMove', () => {
     });
   });
 
-  it('returns null on middle slices, which have no face turn', () => {
-    // The centre column of the front face lies on no outer layer vertically.
-    expect(resolveDragMove('front', [1, 1, 2], [0, 1, 0], 3)).toBeNull();
-    // The centre row, dragged horizontally, likewise.
-    expect(resolveDragMove('front', [1, 1, 2], [1, 0, 0], 3)).toBeNull();
+  it('dragging the front centre upwards turns the M slice (2L, counter-clockwise)', () => {
+    // M follows L; M' carries the front face up, so an upwards drag is 2L'.
+    expect(resolveDragMove('front', [1, 1, 2], [0, 1, 0], 3)).toEqual({
+      face: 'left',
+      direction: 'counterClockwise',
+      layer: 2,
+    });
+  });
+
+  it('dragging the front centre to the right turns the E slice (2D, clockwise)', () => {
+    // E follows D, which carries the front towards the right face.
+    expect(resolveDragMove('front', [1, 1, 2], [1, 0, 0], 3)).toEqual({
+      face: 'down',
+      direction: 'clockwise',
+      layer: 2,
+    });
+  });
+
+  it('dragging the up-face centre row sideways turns the S slice (2F)', () => {
+    // The dead-centre slice along z ties to the front face, matching S.
+    expect(resolveDragMove('up', [1, 2, 1], [1, 0, 0], 3)).toEqual({
+      face: 'front',
+      direction: 'clockwise',
+      layer: 2,
+    });
   });
 
   it('returns null when the drag has no in-plane component', () => {
     expect(resolveDragMove('front', [2, 2, 2], [0, 0, 1], 3)).toBeNull();
   });
 
-  it('resolves inner-grid stickers on larger cubes only at the outer layers', () => {
-    // On a 4×4 the second column from the left is an inner slice.
-    expect(resolveDragMove('front', [1, 3, 3], [0, 1, 0], 4)).toBeNull();
+  it('names inner slices on larger cubes after their nearest face', () => {
+    // On a 4×4 the second column from the left, dragged up, is 2L'.
+    expect(resolveDragMove('front', [1, 3, 3], [0, 1, 0], 4)).toEqual({
+      face: 'left',
+      direction: 'counterClockwise',
+      layer: 2,
+    });
     // The outermost column still turns the right face.
     expect(resolveDragMove('front', [3, 3, 3], [0, 1, 0], 4)).toEqual({
       face: 'right',

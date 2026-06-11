@@ -24,6 +24,7 @@ public sealed class DomainExceptionHandler(IProblemDetailsService problemDetails
             CubeSessionNotFoundException => (StatusCodes.Status404NotFound, "Cube not found"),
             InvalidMoveNotationException => (StatusCodes.Status400BadRequest, "Invalid move notation"),
             InvalidCubeSizeException => (StatusCodes.Status400BadRequest, "Invalid cube size"),
+            InvalidLayerException => (StatusCodes.Status400BadRequest, "Invalid layer"),
             InvalidScrambleLengthException => (StatusCodes.Status400BadRequest, "Invalid scramble length"),
             TooManyMovesException => (StatusCodes.Status400BadRequest, "Too many moves"),
             EmptyMoveHistoryException => (StatusCodes.Status409Conflict, "Nothing to undo"),

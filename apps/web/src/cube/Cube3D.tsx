@@ -18,7 +18,6 @@ import { STICKER_COLORS, colorOf } from './colors';
 import { formatMove } from './notation';
 import {
   buildCubelets,
-  canDragSticker,
   faceNormal,
   resolveDragMove,
   rotationFor,
@@ -69,7 +68,7 @@ interface CubeletMeshProps {
     cubelet: Cubelet,
     event: ThreeEvent<PointerEvent>,
   ) => void;
-  onStickerHover?: (draggable: boolean) => void;
+  onStickerHover?: (hovering: boolean) => void;
 }
 
 function CubeletMesh({ cubelet, size, onStickerPointerDown, onStickerHover }: CubeletMeshProps) {
@@ -78,7 +77,6 @@ function CubeletMesh({ cubelet, size, onStickerPointerDown, onStickerHover }: Cu
       <mesh geometry={cubeletGeometry} material={bodyMaterial} />
       {Object.entries(cubelet.stickers).map(([face, letter]) => {
         const placement = STICKER_PLACEMENTS[face as FaceName];
-        const draggable = canDragSticker(face as FaceName, cubelet.grid, size);
         return (
           <mesh
             key={face}
@@ -87,11 +85,10 @@ function CubeletMesh({ cubelet, size, onStickerPointerDown, onStickerHover }: Cu
             position={placement.position}
             rotation={placement.rotation}
             onPointerDown={
-              onStickerPointerDown && draggable
-                ? (event) => onStickerPointerDown(face as FaceName, cubelet, event)
-                : undefined
+              onStickerPointerDown &&
+              ((event) => onStickerPointerDown(face as FaceName, cubelet, event))
             }
-            onPointerOver={onStickerHover && (() => onStickerHover(draggable))}
+            onPointerOver={onStickerHover && (() => onStickerHover(true))}
             onPointerOut={onStickerHover && (() => onStickerHover(false))}
           />
         );
@@ -132,16 +129,15 @@ function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) 
     getThree().gl.domElement.style.cursor = cursor;
   };
 
-  const handleStickerHover = (draggable: boolean) => {
+  const handleStickerHover = (hovering: boolean) => {
     if (!dragRef.current) {
-      setCursor(draggable && onMove && !animation ? 'grab' : '');
+      setCursor(hovering && onMove && !animation ? 'grab' : '');
     }
   };
 
   const beginDrag = (face: FaceName, cubelet: Cubelet, event: ThreeEvent<PointerEvent>) => {
     // Drags are resolved against the displayed state, so they only start
-    // while no turn is animating. Non-draggable stickers never reach here —
-    // grabbing them falls through to orbiting.
+    // while no turn is animating.
     if (!onMove || animation) {
       return;
     }
