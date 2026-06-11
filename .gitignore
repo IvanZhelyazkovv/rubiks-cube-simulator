@@ -1,0 +1,28 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+TestResults/
+artifacts/
+
+# IDE
+.vs/
+.idea/
+.vscode/
+*.DotSettings.user
+
+# Node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Environment / local
+.env
+.env.local
+*.local.json
+
+# OS
+Thumbs.db
+.DS_Store

@@ -1,0 +1,67 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.{js,jsx,ts,tsx,css,html}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+# --- Language conventions -------------------------------------------------
+csharp_style_namespace_declarations = file_scoped:error
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_prefer_primary_constructors = true:suggestion
+csharp_style_prefer_switch_expression = true:suggestion
+csharp_style_prefer_pattern_matching = true:suggestion
+csharp_prefer_braces = true:warning
+csharp_using_directive_placement = outside_namespace:error
+dotnet_style_require_accessibility_modifiers = always:error
+dotnet_sort_system_directives_first = true
+
+# --- Naming: private fields are _camelCase --------------------------------
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel_case
+dotnet_naming_rule.private_fields_underscore.severity = error
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+
+# --- StyleCop adjustments ---------------------------------------------------
+# SA1101: prefix local calls with this — modern .NET style does not use this.
+dotnet_diagnostic.SA1101.severity = none
+# SA1309: field names should not begin with underscore — we follow the
+# dotnet/runtime convention of _camelCase private fields instead.
+dotnet_diagnostic.SA1309.severity = none
+# SA1633-SA1641: file headers — headers add noise; the repository is the unit of license.
+dotnet_diagnostic.SA1633.severity = none
+dotnet_diagnostic.SA1634.severity = none
+dotnet_diagnostic.SA1635.severity = none
+dotnet_diagnostic.SA1636.severity = none
+dotnet_diagnostic.SA1637.severity = none
+dotnet_diagnostic.SA1638.severity = none
+dotnet_diagnostic.SA1639.severity = none
+dotnet_diagnostic.SA1640.severity = none
+dotnet_diagnostic.SA1641.severity = none
+# SA1200: using directives placement is enforced as outside_namespace above.
+dotnet_diagnostic.SA1200.severity = none
+# SA1413: trailing comma in multi-line initializers — leave to author judgement.
+dotnet_diagnostic.SA1413.severity = none
+# SA1118: parameter spans multiple lines — conflicts with readable collection
+# expressions and raw string literals.
+dotnet_diagnostic.SA1118.severity = none

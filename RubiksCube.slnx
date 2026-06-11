@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RubiksCube.Api/RubiksCube.Api.csproj" />
+    <Project Path="src/RubiksCube.Application/RubiksCube.Application.csproj" />
+    <Project Path="src/RubiksCube.Cli/RubiksCube.Cli.csproj" />
+    <Project Path="src/RubiksCube.Domain/RubiksCube.Domain.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RubiksCube.Tests/RubiksCube.Tests.csproj" />
+  </Folder>
+</Solution>
