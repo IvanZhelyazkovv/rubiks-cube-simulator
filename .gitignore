@@ -29,3 +29,7 @@ src/RubiksCube.Api/wwwroot/
 # OS
 Thumbs.db
 .DS_Store
+
+# Test artifacts
+test-results/
+playwright-report/
