@@ -77,6 +77,43 @@ public sealed class CubesApiTests : IClassFixture<WebApplicationFactory<Program>
     }
 
     [Fact]
+    public async Task ApplyMoves_WithASliceMove_TurnsTheMiddleLayer()
+    {
+        var created = await CreateCubeAsync();
+
+        // 2L' is the M' slice: the front column rises into the up face.
+        var response = await _client.PostAsJsonAsync(
+            $"/api/cubes/{created.Id}/moves", new { moves = "2L'" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var cube = await response.Content.ReadFromJsonAsync<CubeStateDto>();
+        Assert.NotNull(cube);
+        Assert.Equal(["WGW", "WGW", "WGW"], cube.Faces.Up);
+        Assert.Equal(["GYG", "GYG", "GYG"], cube.Faces.Front);
+        Assert.Equal(["2L'"], cube.History);
+    }
+
+    [Fact]
+    public async Task ApplyMoves_WithALayerBeyondTheCube_ReturnsBadRequestProblem()
+    {
+        var created = await CreateCubeAsync();
+
+        var response = await _client.PostAsJsonAsync(
+            $"/api/cubes/{created.Id}/moves", new { moves = "3R" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("application/problem+json", response.Content.Headers.ContentType?.ToString());
+    }
+
+    [Fact]
+    public async Task UnknownApiRoute_ReturnsNotFoundInsteadOfTheSpaFallback()
+    {
+        var response = await _client.GetAsync("/api/no-such-resource");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task ApplyMoves_WithExcessiveMoveCount_ReturnsBadRequestProblem()
     {
         var created = await CreateCubeAsync();

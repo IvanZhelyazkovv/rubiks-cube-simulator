@@ -149,7 +149,10 @@ public sealed class Cube : IEquatable<Cube>
     }
 
     /// <summary>Returns a new cube with all <paramref name="moves"/> applied in order.</summary>
-    /// <param name="moves">The face rotations to apply, in order.</param>
+    /// <param name="moves">The layer rotations to apply, in order.</param>
+    /// <exception cref="InvalidLayerException">
+    /// Thrown when a move's layer does not exist on a cube of this size.
+    /// </exception>
     public Cube Apply(IEnumerable<Move> moves)
     {
         ArgumentNullException.ThrowIfNull(moves);

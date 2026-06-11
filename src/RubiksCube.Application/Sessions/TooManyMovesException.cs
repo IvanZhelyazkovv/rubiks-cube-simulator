@@ -12,8 +12,12 @@ public sealed class TooManyMovesException : Exception
         : base($"At most {maxCount} moves may be applied per request; {count} were sent.")
     {
         Count = count;
+        MaxCount = maxCount;
     }
 
     /// <summary>The number of moves requested.</summary>
     public int Count { get; }
+
+    /// <summary>The largest accepted number of moves per request.</summary>
+    public int MaxCount { get; }
 }

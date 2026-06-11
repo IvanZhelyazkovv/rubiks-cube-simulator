@@ -69,7 +69,12 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapControllers();
-app.MapFallbackToFile("index.html");
+
+// Client-side routes fall back to the SPA. The nonfile constraint keeps the
+// fallback away from asset requests (static files skip endpoint-claimed
+// paths), and the regex keeps unknown API routes honest 404s rather than
+// serving HTML to a JSON client.
+app.MapFallbackToFile("{*path:nonfile:regex(^(?!api(/|$)).*$)}", "index.html");
 
 app.Run();
 

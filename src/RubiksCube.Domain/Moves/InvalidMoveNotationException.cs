@@ -12,8 +12,9 @@ public sealed class InvalidMoveNotationException : Exception
     /// <param name="position">The zero-based character index at which parsing failed.</param>
     public InvalidMoveNotationException(string notation, int position)
         : base($"Invalid move notation at position {position}: '{notation}'. " +
-               "Expected a face letter (U, D, F, B, L, R) optionally followed by ' or 2, " +
-               "with moves separated by spaces.")
+               "Expected a face letter (U, D, F, B, L, R), optionally preceded by a layer " +
+               "number of 2 or more (e.g. 2L) and followed by ' or 2, with moves separated " +
+               "by spaces.")
     {
         Notation = notation;
         Position = position;

@@ -35,7 +35,7 @@ public sealed class ScrambleCubeUseCase(
         }
 
         var scramble = scrambleGenerator.Generate(moveCount);
-        var session = repository.Update(id, current => current.Apply([.. scramble]));
+        var session = repository.Update(id, current => current.Apply(scramble));
 
         return CubeStateMapper.ToDto(session);
     }

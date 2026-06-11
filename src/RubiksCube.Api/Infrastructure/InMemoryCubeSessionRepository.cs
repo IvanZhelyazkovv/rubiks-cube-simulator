@@ -95,7 +95,7 @@ public sealed class InMemoryCubeSessionRepository : ICubeSessionRepository
     public bool Delete(Guid id) => _sessions.TryRemove(id, out _);
 
     private Entry NewEntry(CubeSession session) =>
-        new(session, Interlocked.Increment(ref _clock));
+        new(Interlocked.Increment(ref _clock), session);
 
     // The compare-and-swap below relies on Entry being a record: TryUpdate
     // compares the stored entry to the one this thread read by value, so a
@@ -120,6 +120,10 @@ public sealed class InMemoryCubeSessionRepository : ICubeSessionRepository
         }
     }
 
-    /// <summary>A stored session stamped with a logical last-touched time.</summary>
-    private sealed record Entry(CubeSession Session, long Touched);
+    /// <summary>
+    /// A stored session stamped with a logical last-touched time. The always-unique
+    /// <see cref="Touched"/> comes first so the CAS equality check fails fast
+    /// instead of comparing whole cubes.
+    /// </summary>
+    private sealed record Entry(long Touched, CubeSession Session);
 }

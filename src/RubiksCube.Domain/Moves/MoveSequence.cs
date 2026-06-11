@@ -67,8 +67,10 @@ public sealed class MoveSequence : IReadOnlyList<Move>
                 }
 
                 // Layer 1 is the face itself and is written without a prefix; two
-                // digits cover every supported cube size.
+                // digits cover every supported cube size, and a leading zero is
+                // not a spelling anyone intends.
                 if (position - digitStart > 2
+                    || notation[digitStart] == '0'
                     || !int.TryParse(notation.AsSpan(digitStart, position - digitStart), out layer)
                     || layer < 2)
                 {
@@ -122,8 +124,14 @@ public sealed class MoveSequence : IReadOnlyList<Move>
     /// </summary>
     /// <param name="notation">The notation string to parse.</param>
     /// <param name="sequence">The parsed sequence, or <see cref="Empty"/> when parsing fails.</param>
-    public static bool TryParse(string notation, out MoveSequence sequence)
+    public static bool TryParse(string? notation, out MoveSequence sequence)
     {
+        if (notation is null)
+        {
+            sequence = Empty;
+            return false;
+        }
+
         try
         {
             sequence = Parse(notation);

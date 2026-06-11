@@ -96,7 +96,9 @@ public sealed class CubeRotationPropertyTests
     public void RandomSequenceFollowedByItsInverse_RestoresTheCube(int size)
     {
         var solved = Cube.CreateSolved(size);
-        var scramble = RandomSequence(seed: 20260611 + size, length: 60);
+
+        // Slice moves included: every layer of the cube takes part.
+        var scramble = RandomSequence(seed: 20260611 + size, length: 60, maxLayer: size - 1);
 
         var cube = solved.Apply(scramble).Apply(scramble.Inverse());
 
@@ -107,7 +109,8 @@ public sealed class CubeRotationPropertyTests
     [MemberData(nameof(Sizes))]
     public void ColorCounts_AreInvariantUnderAnySequence(int size)
     {
-        var cube = Cube.CreateSolved(size).Apply(RandomSequence(seed: 99 + size, length: 80));
+        var cube = Cube.CreateSolved(size)
+            .Apply(RandomSequence(seed: 99 + size, length: 80, maxLayer: size - 1));
 
         var counts = new Dictionary<CubeColor, int>();
         foreach (var face in Faces)
@@ -133,6 +136,7 @@ public sealed class CubeRotationPropertyTests
     [InlineData(5)]
     public void CenterStickers_NeverMoveOnOddCubes(int size)
     {
+        // Face turns only: slice moves do carry centre stickers around.
         var cube = Cube.CreateSolved(size).Apply(RandomSequence(seed: 7 + size, length: 80));
         var center = size / 2;
 
@@ -152,7 +156,7 @@ public sealed class CubeRotationPropertyTests
         Assert.Equal(solved.Apply(front).Apply(back), solved.Apply(back).Apply(front));
     }
 
-    private static MoveSequence RandomSequence(int seed, int length)
+    private static MoveSequence RandomSequence(int seed, int length, int maxLayer = 1)
     {
         var random = new Random(seed);
         var moves = new List<Move>(length);
@@ -161,7 +165,8 @@ public sealed class CubeRotationPropertyTests
         {
             var face = Faces[random.Next(Faces.Length)];
             var direction = (RotationDirection)random.Next(3);
-            moves.Add(new Move(face, direction));
+            var layer = random.Next(1, maxLayer + 1);
+            moves.Add(new Move(face, direction, layer));
         }
 
         return MoveSequence.Of(moves);

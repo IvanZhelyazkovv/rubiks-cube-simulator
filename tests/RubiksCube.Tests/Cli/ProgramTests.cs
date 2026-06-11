@@ -74,6 +74,25 @@ public sealed class ProgramTests : IDisposable
         Assert.Contains("4x4x4", _output.ToString());
     }
 
+    [Fact]
+    public void Main_WithASliceMove_AppliesIt()
+    {
+        var exitCode = CliProgram.Main(["2L 2L'"]);
+
+        var output = _output.ToString();
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Moves applied: 2L 2L'", output);
+    }
+
+    [Fact]
+    public void Main_WithALayerBeyondTheCube_FailsWithExplanation()
+    {
+        var exitCode = CliProgram.Main(["3L"]);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("Layer 3 does not exist", _errorOutput.ToString());
+    }
+
     [Theory]
     [InlineData("X")]
     [InlineData("F3")]

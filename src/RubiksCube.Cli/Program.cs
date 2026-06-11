@@ -47,6 +47,17 @@ public static class Program
 
         var solved = Cube.CreateSolved(size);
 
+        Cube result;
+        try
+        {
+            result = solved.Apply(moves);
+        }
+        catch (InvalidLayerException exception)
+        {
+            Console.Error.WriteLine(exception.Message);
+            return 1;
+        }
+
         Console.WriteLine($"Rubik's cube simulator ({size}x{size}x{size})");
         Console.WriteLine();
         Console.WriteLine("Solved starting position (green front, red right, white up):");
@@ -57,7 +68,7 @@ public static class Program
         Console.WriteLine();
         Console.WriteLine("Result:");
         Console.WriteLine();
-        WriteNet(solved.Apply(moves));
+        WriteNet(result);
 
         return 0;
     }

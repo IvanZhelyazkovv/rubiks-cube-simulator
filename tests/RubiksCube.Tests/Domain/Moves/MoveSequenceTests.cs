@@ -56,6 +56,7 @@ public sealed class MoveSequenceTests
     [InlineData("F R+ U", 3)]
     [InlineData("1R", 0)] // layer 1 is the face itself, written without a prefix
     [InlineData("0R", 0)]
+    [InlineData("02L", 0)] // leading zeroes are not a spelling anyone intends
     [InlineData("123R", 0)] // more digits than any supported size needs
     [InlineData("2", 0)] // a layer prefix with no face letter
     [InlineData("2 L", 1)]
@@ -111,11 +112,14 @@ public sealed class MoveSequenceTests
     {
         var valid = MoveSequence.TryParse("F R'", out var sequence);
         var invalid = MoveSequence.TryParse("F X", out var empty);
+        var nullInput = MoveSequence.TryParse(null, out var emptyFromNull);
 
         Assert.True(valid);
         Assert.Equal(2, sequence.Count);
         Assert.False(invalid);
         Assert.Empty(empty);
+        Assert.False(nullInput);
+        Assert.Empty(emptyFromNull);
     }
 
     [Fact]

@@ -17,6 +17,9 @@ public interface ICubeSessionRepository
 
     /// <summary>Adds a new session to the store.</summary>
     /// <param name="session">The session to add.</param>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when a session with the same id already exists.
+    /// </exception>
     void Add(CubeSession session);
 
     /// <summary>

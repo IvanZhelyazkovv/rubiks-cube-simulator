@@ -51,6 +51,20 @@ public sealed class InMemoryCubeSessionRepositoryTests
     }
 
     [Fact]
+    public void Add_AtCapacityOne_KeepsTheNewSessionAndEvictsTheOld()
+    {
+        var bounded = new InMemoryCubeSessionRepository(capacity: 1);
+        var first = CubeSession.CreateNew(3);
+        var second = CubeSession.CreateNew(3);
+
+        bounded.Add(first);
+        bounded.Add(second);
+
+        Assert.Equal(second, bounded.Get(second.Id));
+        Assert.Throws<CubeSessionNotFoundException>(() => bounded.Get(first.Id));
+    }
+
+    [Fact]
     public void Add_EvictsTheLeastRecentlyTouchedSessionWhenFull()
     {
         var bounded = new InMemoryCubeSessionRepository(capacity: 2);
