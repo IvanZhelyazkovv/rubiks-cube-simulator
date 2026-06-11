@@ -384,6 +384,26 @@ export interface components {
              */
             size?: number | null;
         };
+        /**
+         * @description The six faces of the cube, each as rows of colour letters from top to bottom
+         *     (e.g. `"WWW"`) using W, Y, G, B, R, O. Named properties — rather than a
+         *     dictionary — so the published OpenAPI contract guarantees all six faces and
+         *     generated clients get them statically typed.
+         */
+        CubeFacesDto: {
+            /** @description The up face. */
+            up: string[];
+            /** @description The down face. */
+            down: string[];
+            /** @description The front face. */
+            front: string[];
+            /** @description The back face. */
+            back: string[];
+            /** @description The left face. */
+            left: string[];
+            /** @description The right face. */
+            right: string[];
+        };
         /** @description The client-facing representation of a cube session. */
         CubeStateDto: {
             /**
@@ -398,14 +418,7 @@ export interface components {
             size: number;
             /** @description Whether every face currently shows a single colour. */
             isSolved: boolean;
-            /**
-             * @description The six faces keyed by name (`up`, `down`, `front`, `back`,
-             *     `left`, `right`), each as rows of colour letters from top to bottom,
-             *     e.g. `"WWW"` — using W, Y, G, B, R, O.
-             */
-            faces: {
-                [key: string]: string[];
-            };
+            faces: components["schemas"]["CubeFacesDto"];
             /** @description Every move applied since creation or the last reset, in Singmaster notation. */
             history: string[];
         };

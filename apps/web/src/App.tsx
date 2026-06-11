@@ -76,6 +76,7 @@ export default function App() {
               state={session.state}
               animation={session.animation}
               onAnimationComplete={session.completeAnimation}
+              onMove={session.applySequence}
             />
           )}
         </section>
@@ -109,10 +110,17 @@ export default function App() {
                 <h2 className="mb-1.5 text-xs font-semibold tracking-wide text-slate-400 uppercase">
                   Rotate a face
                 </h2>
-                <MovePad disabled={false} onMove={session.applySequence} />
-                <p className="mt-1.5 hidden text-xs text-slate-500 sm:block">
-                  Tip: press U, D, F, B, L or R on the keyboard — hold Shift for counter-clockwise.
-                  Turns queue up while one is animating.
+                <MovePad
+                  disabled={session.busy && !session.queueing}
+                  onMove={session.applySequence}
+                />
+                <p className="mt-1.5 text-xs text-slate-500">
+                  Tip: drag a sticker on the 3D cube to turn its row or column.
+                  <span className="hidden sm:inline">
+                    {' '}
+                    Or press U, D, F, B, L or R — hold Shift for counter-clockwise. Turns queue up
+                    while one is animating.
+                  </span>
                 </p>
               </div>
 
@@ -120,7 +128,10 @@ export default function App() {
                 <h2 className="mb-1.5 text-xs font-semibold tracking-wide text-slate-400 uppercase">
                   Apply a sequence
                 </h2>
-                <SequenceInput disabled={session.busy} onApply={session.applySequence} />
+                <SequenceInput
+                  disabled={session.busy && !session.queueing}
+                  onApply={session.applySequence}
+                />
               </div>
 
               <HistoryPanel

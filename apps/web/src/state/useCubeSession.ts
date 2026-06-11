@@ -26,6 +26,11 @@ export interface CubeSessionApi {
   animation: PendingAnimation | null;
   /** Whether an operation is in flight — non-queueable controls should be disabled. */
   busy: boolean;
+  /**
+   * Whether the in-flight operation is the move drain, which accepts further
+   * moves into its queue — move inputs stay enabled while this is true.
+   */
+  queueing: boolean;
   /** Progress through the current queue of moves, when more than one is pending. */
   progress: RunProgress | null;
   /** The most recent error, already in human-readable form. */
@@ -53,6 +58,9 @@ export interface CubeSessionApi {
 
 const REWIND_SPEED = 2.4;
 
+/** The most moves that may wait in the input queue — key autorepeat, not malice. */
+const MaxQueuedMoves = 50;
+
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -75,6 +83,7 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
   const [state, setState] = useState<CubeState | null>(null);
   const [animation, setAnimation] = useState<PendingAnimation | null>(null);
   const [busy, setBusy] = useState(false);
+  const [queueing, setQueueing] = useState(false);
   const [progress, setProgress] = useState<RunProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,6 +102,23 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  // Best-effort cleanup: tell the server when the tab abandons its session.
+  // keepalive lets the request outlive the page; eviction on the server covers
+  // whatever this cannot (crashes, lost connectivity).
+  useEffect(() => {
+    const releaseSession = () => {
+      const session = stateRef.current;
+      if (session) {
+        void fetch(`/api/cubes/${session.id}`, { method: 'DELETE', keepalive: true }).catch(
+          () => undefined,
+        );
+      }
+    };
+
+    window.addEventListener('pagehide', releaseSession);
+    return () => window.removeEventListener('pagehide', releaseSession);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,10 +180,14 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
     animationDone.current = null;
   }, []);
 
-  /** Serializes operations: one at a time, with busy state and error capture. */
-  const run = useCallback((operation: () => Promise<void>) => {
+  /**
+   * Serializes operations: one at a time, with busy state and error capture.
+   * Returns whether the operation was accepted — callers that set up state of
+   * their own (like the queue drain) must roll it back on rejection.
+   */
+  const run = useCallback((operation: () => Promise<void>): boolean => {
     if (busyRef.current || !stateRef.current) {
-      return;
+      return false;
     }
 
     busyRef.current = true;
@@ -174,6 +204,8 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
         setProgress(null);
         runTotals.current = { done: 0, total: 0 };
       });
+
+    return true;
   }, []);
 
   const applySequence = useCallback(
@@ -187,10 +219,17 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
         return;
       }
 
-      // A drain is already running — it will pick the new moves up.
+      // A drain is already running — it will pick the new moves up,
+      // within the bounded queue.
       if (drainingRef.current) {
-        queueRef.current.push(...parsed.moves);
-        runTotals.current.total += parsed.moves.length;
+        const space = Math.max(0, MaxQueuedMoves - queueRef.current.length);
+        const appended = parsed.moves.slice(0, space);
+        if (appended.length === 0) {
+          return;
+        }
+
+        queueRef.current.push(...appended);
+        runTotals.current.total += appended.length;
         setProgress({ ...runTotals.current });
         return;
       }
@@ -201,10 +240,13 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
         return;
       }
 
-      queueRef.current.push(...parsed.moves);
-      runTotals.current = { done: 0, total: parsed.moves.length };
+      // Stage the queue and flags before starting the drain — it reads the
+      // queue synchronously. Rolled back below if `run` rejects the operation.
+      queueRef.current = parsed.moves.slice(0, MaxQueuedMoves);
+      runTotals.current = { done: 0, total: queueRef.current.length };
       drainingRef.current = true;
-      run(async () => {
+
+      const accepted = run(async () => {
         try {
           let session = stateRef.current;
           for (
@@ -224,8 +266,20 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
           }
         } finally {
           drainingRef.current = false;
+          setQueueing(false);
         }
       });
+
+      if (accepted) {
+        setQueueing(true);
+        return;
+      }
+
+      // Input before the session exists (still loading, failed create) is
+      // dropped like any other disabled control — nothing may latch.
+      queueRef.current = [];
+      runTotals.current = { done: 0, total: 0 };
+      drainingRef.current = false;
     },
     [run, animateMove],
   );
@@ -309,6 +363,9 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
       }
 
       queueRef.current = [];
+      drainingRef.current = false;
+      setQueueing(false);
+      runTotals.current = { done: 0, total: 0 };
       releaseAnimation();
       setState(null);
       setError(null);
@@ -323,6 +380,7 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
     state,
     animation,
     busy,
+    queueing,
     progress,
     error,
     applySequence,

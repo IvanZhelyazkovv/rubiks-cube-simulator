@@ -1,16 +1,35 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { Group, MeshStandardMaterial, PlaneGeometry, Vector3 } from 'three';
+import {
+  Group,
+  MeshStandardMaterial,
+  Plane,
+  PlaneGeometry,
+  Raycaster,
+  Vector2,
+  Vector3,
+} from 'three';
 import { RoundedBoxGeometry } from 'three-stdlib';
 
 import type { CubeState, FaceName } from '../api/types';
 import type { PendingAnimation } from '../state/useCubeSession';
 import { STICKER_COLORS, colorOf } from './colors';
-import { buildCubelets, rotationFor, scenePosition, type Cubelet } from './geometry';
+import { formatMove } from './notation';
+import {
+  buildCubelets,
+  faceNormal,
+  resolveDragMove,
+  rotationFor,
+  scenePosition,
+  type Cubelet,
+} from './geometry';
 
 const STICKER_OFFSET = 0.501;
 const QUARTER_TURN_SECONDS = 0.28;
+
+/** How far (in scene units) a drag must travel before it counts as a turn. */
+const DRAG_THRESHOLD = 0.35;
 
 // Geometries and materials are shared across every cubelet and every render —
 // a 5×5 cube would otherwise create hundreds of identical GPU resources.
@@ -44,9 +63,14 @@ function easeInOutCubic(t: number): number {
 interface CubeletMeshProps {
   cubelet: Cubelet;
   size: number;
+  onStickerPointerDown?: (
+    face: FaceName,
+    cubelet: Cubelet,
+    event: ThreeEvent<PointerEvent>,
+  ) => void;
 }
 
-function CubeletMesh({ cubelet, size }: CubeletMeshProps) {
+function CubeletMesh({ cubelet, size, onStickerPointerDown }: CubeletMeshProps) {
   return (
     <group position={scenePosition(cubelet.grid, size)}>
       <mesh geometry={cubeletGeometry} material={bodyMaterial} />
@@ -59,6 +83,10 @@ function CubeletMesh({ cubelet, size }: CubeletMeshProps) {
             material={stickerMaterials.get(letter)}
             position={placement.position}
             rotation={placement.rotation}
+            onPointerDown={
+              onStickerPointerDown &&
+              ((event) => onStickerPointerDown(face as FaceName, cubelet, event))
+            }
           />
         );
       })}
@@ -70,13 +98,113 @@ interface PuzzleProps {
   state: CubeState;
   animation: PendingAnimation | null;
   onAnimationComplete: () => void;
+  onMove?: (notation: string) => void;
 }
 
-function Puzzle({ state, animation, onAnimationComplete }: PuzzleProps) {
+function Puzzle({ state, animation, onAnimationComplete, onMove }: PuzzleProps) {
   const rotatingGroup = useRef<Group>(null);
   const progress = useRef(0);
   const finished = useRef(false);
   const invalidate = useThree((three) => three.invalidate);
+  const camera = useThree((three) => three.camera);
+  const gl = useThree((three) => three.gl);
+  // Orbit controls are an external, mutable three.js object; fetching them
+  // imperatively at event time keeps render-scope values immutable.
+  const getThree = useThree((three) => three.get);
+  const orbitControls = () => getThree().controls as unknown as { enabled: boolean } | null;
+
+  /** An in-progress sticker drag: where it started and the plane it moves in. */
+  const dragRef = useRef<{
+    face: FaceName;
+    cubelet: Cubelet;
+    start: Vector3;
+    plane: Plane;
+  } | null>(null);
+
+  const beginDrag = (face: FaceName, cubelet: Cubelet, event: ThreeEvent<PointerEvent>) => {
+    // Drags are resolved against the displayed state, so they only start
+    // while no turn is animating.
+    if (!onMove || animation) {
+      return;
+    }
+
+    event.stopPropagation();
+    const start = event.point.clone();
+    dragRef.current = {
+      face,
+      cubelet,
+      start,
+      plane: new Plane().setFromNormalAndCoplanarPoint(new Vector3(...faceNormal(face)), start),
+    };
+
+    // Orbiting pauses while the pointer is turning a layer.
+    const controls = orbitControls();
+    if (controls) {
+      controls.enabled = false;
+    }
+  };
+
+  useEffect(() => {
+    const element = gl.domElement;
+    const raycaster = new Raycaster();
+    const pointer = new Vector2();
+    const hit = new Vector3();
+
+    const endDrag = () => {
+      if (dragRef.current) {
+        dragRef.current = null;
+        const controls = getThree().controls as unknown as { enabled: boolean } | null;
+        if (controls) {
+          controls.enabled = true;
+        }
+      }
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag) {
+        return;
+      }
+
+      // Follow the pointer on the grabbed face's plane; the drag vector is the
+      // world-space path travelled since the sticker was grabbed.
+      const rect = element.getBoundingClientRect();
+      pointer.set(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      raycaster.setFromCamera(pointer, camera);
+      if (!raycaster.ray.intersectPlane(drag.plane, hit)) {
+        return;
+      }
+
+      const delta = hit.clone().sub(drag.start);
+      if (delta.length() < DRAG_THRESHOLD) {
+        return;
+      }
+
+      const move = resolveDragMove(
+        drag.face,
+        drag.cubelet.grid,
+        [delta.x, delta.y, delta.z],
+        state.size,
+      );
+      endDrag();
+      if (move && onMove) {
+        onMove(formatMove(move));
+      }
+    };
+
+    element.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', endDrag);
+    window.addEventListener('pointercancel', endDrag);
+    return () => {
+      element.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', endDrag);
+      window.removeEventListener('pointercancel', endDrag);
+      endDrag();
+    };
+  }, [gl, camera, getThree, onMove, state.size]);
 
   const cubelets = useMemo(() => buildCubelets(state), [state]);
   const rotation = useMemo(() => {
@@ -119,7 +247,10 @@ function Puzzle({ state, animation, onAnimationComplete }: PuzzleProps) {
       return;
     }
 
-    progress.current = Math.min(1, progress.current + delta / rotation.duration);
+    // With an on-demand frameloop the first delta after an idle period spans
+    // the whole gap; unclamped it would snap the turn instead of animating it.
+    const frameDelta = Math.min(delta, 1 / 30);
+    progress.current = Math.min(1, progress.current + frameDelta / rotation.duration);
 
     const angle = easeInOutCubic(progress.current) * rotation.angle;
     rotatingGroup.current.quaternion.setFromAxisAngle(rotation.axisVector, angle);
@@ -137,11 +268,21 @@ function Puzzle({ state, animation, onAnimationComplete }: PuzzleProps) {
     <group scale={3 / state.size}>
       <group ref={rotatingGroup}>
         {layers.rotating.map((cubelet) => (
-          <CubeletMesh key={cubelet.key} cubelet={cubelet} size={state.size} />
+          <CubeletMesh
+            key={cubelet.key}
+            cubelet={cubelet}
+            size={state.size}
+            onStickerPointerDown={beginDrag}
+          />
         ))}
       </group>
       {layers.still.map((cubelet) => (
-        <CubeletMesh key={cubelet.key} cubelet={cubelet} size={state.size} />
+        <CubeletMesh
+          key={cubelet.key}
+          cubelet={cubelet}
+          size={state.size}
+          onStickerPointerDown={beginDrag}
+        />
       ))}
     </group>
   );
@@ -151,21 +292,29 @@ export interface Cube3DProps {
   state: CubeState;
   animation: PendingAnimation | null;
   onAnimationComplete: () => void;
+  /** Receives Singmaster notation when the user turns a layer by dragging a sticker. */
+  onMove?: (notation: string) => void;
 }
 
 /**
- * The interactive 3D cube: drag to orbit, scroll to zoom. Face turns play as
- * smooth layer rotations; when a turn finishes the authoritative server state
- * is revealed by the session hook. The canvas renders on demand, so an idle
- * cube costs no GPU time.
+ * The interactive 3D cube: drag a sticker to turn its layer, drag the
+ * background to orbit, scroll to zoom. Face turns play as smooth layer
+ * rotations; when a turn finishes the authoritative server state is revealed
+ * by the session hook. The canvas renders on demand, so an idle cube costs no
+ * GPU time.
  */
-export function Cube3D({ state, animation, onAnimationComplete }: Cube3DProps) {
+export function Cube3D({ state, animation, onAnimationComplete, onMove }: Cube3DProps) {
   return (
     <Canvas frameloop="demand" dpr={[1, 2]} camera={{ position: [4.4, 3.6, 5.6], fov: 42 }}>
       <ambientLight intensity={1.1} />
       <directionalLight position={[6, 10, 8]} intensity={1.4} />
       <directionalLight position={[-6, -4, -8]} intensity={0.5} />
-      <Puzzle state={state} animation={animation} onAnimationComplete={onAnimationComplete} />
+      <Puzzle
+        state={state}
+        animation={animation}
+        onAnimationComplete={onAnimationComplete}
+        onMove={onMove}
+      />
       <OrbitControls enablePan={false} minDistance={5} maxDistance={14} makeDefault />
     </Canvas>
   );

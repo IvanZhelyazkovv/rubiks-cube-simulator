@@ -10,12 +10,14 @@ const FACE_KEYS = new Set(['U', 'D', 'F', 'B', 'L', 'R']);
 export function useKeyboardMoves(onMove: (notation: string) => void): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.altKey || event.metaKey) {
+      // One turn per physical key press: ignore OS autorepeat from held keys,
+      // modifier-chord shortcuts and in-progress IME composition.
+      if (event.repeat || event.isComposing || event.ctrlKey || event.altKey || event.metaKey) {
         return;
       }
 
       const target = event.target as HTMLElement | null;
-      if (target?.closest('input, textarea, select')) {
+      if (target?.closest('input, textarea, select, [contenteditable]')) {
         return;
       }
 

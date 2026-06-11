@@ -200,6 +200,68 @@ describe('useCubeSession', () => {
     expect(client.deleteCube).toHaveBeenCalledWith('session-1');
   });
 
+  it('moves requested before the session exists are dropped, and work after it loads', async () => {
+    let resolveCreate: (state: CubeState) => void = () => {};
+    vi.mocked(client.createCube).mockReturnValue(
+      new Promise((resolve) => {
+        resolveCreate = resolve;
+      }),
+    );
+    vi.mocked(client.applyMoves).mockResolvedValue(cubeState({ isSolved: false, history: ['F'] }));
+
+    const { result } = renderHook(() => useCubeSession());
+
+    // Keyboard mashing while "Creating a cube…" must not latch anything.
+    act(() => result.current.applySequence('F'));
+    act(() => result.current.applySequence('R U'));
+
+    expect(result.current.busy).toBe(false);
+    expect(result.current.progress).toBeNull();
+    expect(client.applyMoves).not.toHaveBeenCalled();
+
+    act(() => resolveCreate(cubeState()));
+    await waitFor(() => expect(result.current.state).not.toBeNull());
+
+    // The pipeline still works once the session exists.
+    act(() => result.current.applySequence('F'));
+    await waitFor(() => expect(result.current.animation).not.toBeNull());
+    act(() => result.current.completeAnimation());
+    await waitFor(() => expect(result.current.busy).toBe(false));
+    expect(client.applyMoves).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes queueing only while the move drain runs', async () => {
+    vi.mocked(client.applyMoves).mockResolvedValue(cubeState({ history: ['F'] }));
+    vi.mocked(client.scrambleCube).mockResolvedValue(cubeState({ history: ['F', 'U'] }));
+
+    const { result } = renderHook(() => useCubeSession());
+    await waitFor(() => expect(result.current.state).not.toBeNull());
+
+    act(() => result.current.applySequence('F'));
+    await waitFor(() => expect(result.current.animation).not.toBeNull());
+    expect(result.current.queueing).toBe(true);
+    act(() => result.current.completeAnimation());
+    await waitFor(() => expect(result.current.busy).toBe(false));
+    expect(result.current.queueing).toBe(false);
+
+    // Scramble is busy but not queueing — move inputs should disable.
+    act(() => result.current.scramble());
+    expect(result.current.queueing).toBe(false);
+    await waitFor(() => expect(result.current.busy).toBe(false));
+  });
+
+  it('caps the queue at fifty pending moves', async () => {
+    vi.mocked(client.applyMoves).mockResolvedValue(cubeState({ history: ['F'] }));
+
+    const { result } = renderHook(() => useCubeSession());
+    await waitFor(() => expect(result.current.state).not.toBeNull());
+
+    act(() => result.current.applySequence(Array(60).fill('F').join(' ')));
+
+    await waitFor(() => expect(result.current.progress).not.toBeNull());
+    expect(result.current.progress?.total).toBe(50);
+  });
+
   it('scramble and reset reveal the new state without an animation', async () => {
     vi.mocked(client.scrambleCube).mockResolvedValue(
       cubeState({ isSolved: false, history: ['F', 'U2'] }),

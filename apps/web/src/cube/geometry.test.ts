@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CubeState, FaceName } from '../api/types';
-import { buildCubelets, rotationFor, scenePosition } from './geometry';
+import { buildCubelets, resolveDragMove, rotationFor, scenePosition } from './geometry';
 
 /** A solved 3×3 in the API's shape: green front, red right, white up. */
 function solvedFaces(): Pick<CubeState, 'faces' | 'size'> {
@@ -110,5 +110,63 @@ describe('scenePosition', () => {
     expect(scenePosition([1, 1, 1], 3)).toEqual([0, 0, 0]);
     expect(scenePosition([2, 2, 2], 3)).toEqual([1, 1, 1]);
     expect(scenePosition([0, 0, 0], 2)).toEqual([-0.5, -0.5, -0.5]);
+  });
+});
+
+describe('resolveDragMove', () => {
+  // Each expectation below was verified against a physical cube.
+
+  it('dragging the front top-right sticker to the right turns the up face counter-clockwise', () => {
+    // U moves the front's top row to the left, so rightwards is U'.
+    expect(resolveDragMove('front', [2, 2, 2], [1, 0, 0], 3)).toEqual({
+      face: 'up',
+      direction: 'counterClockwise',
+    });
+  });
+
+  it('dragging the front top-right sticker upwards turns the right face clockwise', () => {
+    // R carries the front's right column up to the up face.
+    expect(resolveDragMove('front', [2, 2, 2], [0, 1, 0], 3)).toEqual({
+      face: 'right',
+      direction: 'clockwise',
+    });
+  });
+
+  it('dragging the up face left column towards the viewer turns the left face clockwise', () => {
+    // L carries the up face's left column down to the front.
+    expect(resolveDragMove('up', [0, 2, 0], [0, 0, 1], 3)).toEqual({
+      face: 'left',
+      direction: 'clockwise',
+    });
+  });
+
+  it('dragging the front bottom row to the left turns the down face counter-clockwise', () => {
+    // D (clockwise seen from below) carries the front's bottom row towards
+    // the right face, so a drag to the left asks for D'.
+    expect(resolveDragMove('front', [1, 0, 2], [-1, 0, 0], 3)).toEqual({
+      face: 'down',
+      direction: 'counterClockwise',
+    });
+  });
+
+  it('returns null on middle slices, which have no face turn', () => {
+    // The centre column of the front face lies on no outer layer vertically.
+    expect(resolveDragMove('front', [1, 1, 2], [0, 1, 0], 3)).toBeNull();
+    // The centre row, dragged horizontally, likewise.
+    expect(resolveDragMove('front', [1, 1, 2], [1, 0, 0], 3)).toBeNull();
+  });
+
+  it('returns null when the drag has no in-plane component', () => {
+    expect(resolveDragMove('front', [2, 2, 2], [0, 0, 1], 3)).toBeNull();
+  });
+
+  it('resolves inner-grid stickers on larger cubes only at the outer layers', () => {
+    // On a 4×4 the second column from the left is an inner slice.
+    expect(resolveDragMove('front', [1, 3, 3], [0, 1, 0], 4)).toBeNull();
+    // The outermost column still turns the right face.
+    expect(resolveDragMove('front', [3, 3, 3], [0, 1, 0], 4)).toEqual({
+      face: 'right',
+      direction: 'clockwise',
+    });
   });
 });
