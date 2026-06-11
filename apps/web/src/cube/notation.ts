@@ -72,10 +72,13 @@ export function parseNotation(notation: string): ParseResult {
     const letter = notation[position];
     const face = letter ? FACE_BY_LETTER[letter] : undefined;
     if (!face) {
+      // At end of input the offender is the last consumed character (a layer
+      // prefix with no face letter) — the same position the server reports.
+      const errorPosition = letter === undefined ? Math.max(position - 1, 0) : position;
       return {
         ok: false,
-        position,
-        message: `Unexpected '${letter ?? 'end of input'}' at position ${position + 1} — expected U, D, F, B, L or R.`,
+        position: errorPosition,
+        message: `Unexpected '${letter ?? 'end of input'}' at position ${errorPosition + 1} — expected U, D, F, B, L or R.`,
       };
     }
 

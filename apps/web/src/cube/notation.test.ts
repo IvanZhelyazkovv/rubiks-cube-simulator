@@ -51,7 +51,7 @@ describe('parseNotation', () => {
     ['1R', 0], // layer 1 is the face itself, written without a prefix
     ['02L', 0], // leading zeroes are not a spelling anyone intends
     ['123R', 0],
-    ['2', 1], // a layer prefix with no face letter
+    ['2', 0], // a layer prefix with no face letter
   ])('reports the position of invalid input %s', (notation, position) => {
     const result = parseNotation(notation);
 
