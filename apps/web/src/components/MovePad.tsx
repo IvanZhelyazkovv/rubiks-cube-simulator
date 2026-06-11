@@ -22,9 +22,9 @@ export function MovePad({ disabled, onMove }: MovePadProps) {
               type="button"
               disabled={disabled}
               onClick={() => onMove(token)}
-              className="rounded-md bg-slate-700/70 px-2 py-1.5 font-mono text-sm font-semibold
+              className="rounded-md bg-slate-700/70 px-2 py-2.5 font-mono text-sm font-semibold
                          text-slate-100 transition hover:bg-slate-600 active:scale-95
-                         disabled:cursor-not-allowed disabled:opacity-40"
+                         disabled:cursor-not-allowed disabled:opacity-40 sm:py-1.5"
             >
               {token}
             </button>

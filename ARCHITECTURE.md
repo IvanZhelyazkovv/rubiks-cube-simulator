@@ -109,6 +109,14 @@ its tests cannot share a common mistake.
   checks every path, parameter, body and response at compile time. CI
   regenerates the schema against the running API and fails on drift, so the
   front end cannot silently disagree with the server.
+
+  The heavier alternative — a full client generator such as OpenAPI Generator's
+  `typescript-fetch`, which emits per-controller API classes, model files and a
+  runtime — earns its place when many controllers feed many consuming apps. With
+  one controller and seven endpoints it would add a Java-based toolchain and
+  dozens of generated files for the same drift protection, so the types-only
+  generation was the deliberate choice. The seam is thin: swapping generators
+  later only touches `src/api/client.ts`.
 - **Cube size is a policy, not a model limit.** The domain supports any size ≥ 2;
   the application's create-cube policy caps it at 10 to keep payloads and
   rendering sensible, and both entry points — API and console — share that one

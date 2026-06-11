@@ -67,7 +67,10 @@ export default function App() {
       )}
 
       <main className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <section className="min-h-64 flex-1" aria-label="3D cube">
+        <section
+          className="h-[38vh] min-h-52 shrink-0 lg:h-auto lg:min-h-64 lg:flex-1"
+          aria-label="3D cube"
+        >
           {session.state && (
             <Cube3D
               state={session.state}
@@ -78,8 +81,8 @@ export default function App() {
         </section>
 
         <aside
-          className="flex w-full flex-col gap-4 overflow-y-auto border-t border-slate-800 p-4
-                     lg:w-96 lg:border-t-0 lg:border-l"
+          className="flex min-h-0 w-full flex-1 flex-col gap-4 overflow-y-auto border-t
+                     border-slate-800 p-4 lg:w-96 lg:flex-none lg:border-t-0 lg:border-l"
         >
           {session.state ? (
             <>
@@ -107,7 +110,7 @@ export default function App() {
                   Rotate a face
                 </h2>
                 <MovePad disabled={false} onMove={session.applySequence} />
-                <p className="mt-1.5 text-xs text-slate-500">
+                <p className="mt-1.5 hidden text-xs text-slate-500 sm:block">
                   Tip: press U, D, F, B, L or R on the keyboard — hold Shift for counter-clockwise.
                   Turns queue up while one is animating.
                 </p>
