@@ -1,4 +1,4 @@
-﻿using CliProgram = RubiksCube.Cli.Program;
+using CliProgram = RubiksCube.Cli.Program;
 
 namespace RubiksCube.Tests.Cli;
 
