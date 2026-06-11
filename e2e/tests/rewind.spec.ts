@@ -11,11 +11,13 @@ test('rewind replays the inverse of a scramble back to solved', async ({ page })
   await openApp(page);
 
   await page.getByRole('button', { name: 'Scramble' }).click();
-  await expect(page.getByText('25 moves')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('25 moves', { exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId('solved-badge')).not.toBeVisible();
 
   await page.getByRole('button', { name: 'Rewind' }).click();
 
-  await expect(page.getByText('0 moves')).toBeVisible({ timeout: 30_000 });
+  // exact: true matters — a bare '0 moves' already matches the '20 moves'
+  // and '10 moves' the counter passes through on the way down.
+  await expect(page.getByText('0 moves', { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('solved-badge')).toBeVisible({ timeout: 10_000 });
 });

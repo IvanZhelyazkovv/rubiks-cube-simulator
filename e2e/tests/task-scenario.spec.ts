@@ -16,7 +16,7 @@ test('the task sequence produces the expected exploded view, sticker by sticker'
 
   // The history reports all six moves once the final server state is in,
   // and the run button re-enables when the run is done.
-  await expect(page.getByText('6 moves')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('6 moves', { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(runButton).toBeEnabled({ timeout: 15_000 });
 
   await expect(page.getByTestId('solved-badge')).not.toBeVisible();
