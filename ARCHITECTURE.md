@@ -103,9 +103,26 @@ its tests cannot share a common mistake.
   API. The client's geometry module only converts server state into 3D cubelets
   and decides which layer to animate — using the same face-orientation
   conventions as the server, so both views are projections of one state.
+- **The web client is generated from the contract.** The API publishes a strict
+  OpenAPI document (non-nullable means required, enforced by a schema filter);
+  the client's TypeScript types are generated from it and the typed client
+  checks every path, parameter, body and response at compile time. CI
+  regenerates the schema against the running API and fails on drift, so the
+  front end cannot silently disagree with the server.
 - **Cube size is a policy, not a model limit.** The domain supports any size ≥ 2;
-  the create-cube use case caps sessions at 10 to keep payloads sensible. The
-  console accepts any supported size.
+  the application's create-cube policy caps it at 10 to keep payloads and
+  rendering sensible, and both entry points — API and console — share that one
+  rule.
+- **Sessions are bounded and anonymous by design.** The in-memory store evicts
+  the least-recently-touched session beyond a fixed capacity, and the web UI
+  deletes a session it abandons, so the process cannot grow without limit. There
+  is no authentication: a session id is an unguessable GUID acting as a
+  capability, which is proportionate for an in-memory toy domain — any real
+  deployment would put per-user auth and quotas in front of it.
+- **Undo and rewind fall out of the move algebra.** Every move knows its
+  inverse, so undo applies the inverse of the last move and rewind replays the
+  inverse of the whole history — no snapshots, no extra state, and the cube
+  provably returns to where it was.
 
 ## Running everything
 

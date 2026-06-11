@@ -27,6 +27,37 @@ jobs:
       - name: Test
         run: dotnet test --no-build --configuration Release
 
+  contract:
+    name: Contract — schema drift gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Start the API
+        run: |
+          dotnet run --project src/RubiksCube.Api &
+          for i in $(seq 1 30); do
+            curl --silent --fail http://localhost:5180/swagger/v1/swagger.json > /dev/null && break
+            sleep 2
+          done
+
+      - name: Regenerate the client schema
+        working-directory: apps/web
+        run: npx -y openapi-typescript@7.13.0 http://localhost:5180/swagger/v1/swagger.json -o src/api/schema.d.ts
+
+      - name: Fail if the checked-in schema drifted from the API
+        run: git diff --exit-code -- apps/web/src/api/schema.d.ts
+
   web:
     name: Web — lint, test & build
     runs-on: ubuntu-latest

@@ -8,6 +8,10 @@ cube size from 2×2 up (3×3 by default). The cube starts solved and oriented as
 [rubiks-cube-solver.com](https://rubiks-cube-solver.com/): **green at the front, red
 on the right, white on top**.
 
+> **Scope note:** the domain model and the console runner alone satisfy the task —
+> they are the part to review first. The REST API and the web UI are an optional
+> showcase built on the same domain.
+
 ## Prerequisites
 
 | Tool | Needed for | Notes |
@@ -51,7 +55,7 @@ dotnet run --project src/RubiksCube.Cli -- "R U R' U'" --size 4
 dotnet test
 ```
 
-243 tests cover every face rotation with hand-derived expected states, algebraic
+The suite covers every face rotation with hand-derived expected states, algebraic
 properties (four quarter turns restore the cube, a move followed by its inverse
 restores the cube, scramble-and-undo round trips) across cube sizes 2–5, the
 notation parser, the REST API end to end, and the task's verification sequence
@@ -66,9 +70,11 @@ npm run test
 ## The web UI
 
 An interactive 3D cube (drag to orbit) with animated face turns, the exploded
-view, a move pad for all eighteen face turns, free-text sequences, undo,
-scramble, reset and cube sizes from 2×2 to 5×5 — plus a button that runs the
-task's verification sequence move by move.
+view, a move pad for all eighteen face turns, keyboard control (U D F B L R,
+Shift for counter-clockwise — turns queue while one animates), free-text
+sequences, undo, a rewind that replays the inverse of the whole history back to
+solved, scramble, reset and cube sizes from 2×2 to 5×5 — plus a button that runs
+the task's verification sequence move by move.
 
 ```bash
 # 1. Build the UI into the API's wwwroot (first time only, or after UI changes)
@@ -94,8 +100,9 @@ hand-written sticker permutation tables. Every sticker maps to an exact integer
 position and face normal in cube space; turning a face is a 90° integer rotation
 of its outer layer; the spatial convention lives in one six-row table that can be
 checked against the exploded view. That is what makes any cube size work through
-a single code path — and what the 243 tests pin down from several independent
-directions.
+a single code path — and what 300+ automated tests pin down from several
+independent directions. The web client's types are generated from the API's
+OpenAPI document, with a CI gate that fails on contract drift.
 
 The long version, including the layering and the reasoning behind the design
 decisions, is in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
