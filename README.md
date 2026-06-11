@@ -67,6 +67,15 @@ npm ci
 npm run test
 ```
 
+End-to-end tests drive the real stack — the API serving the built UI in a real
+browser, 3D view included — through Playwright, on desktop and phone viewports:
+
+```bash
+cd apps/web && npm ci && npm run build     # the E2E suite drives the built UI
+cd ../e2e && npm ci && npx playwright install chromium
+npx playwright test                        # Playwright starts the API itself
+```
+
 ## The web UI
 
 An interactive 3D cube (drag to orbit) with animated face turns, the exploded

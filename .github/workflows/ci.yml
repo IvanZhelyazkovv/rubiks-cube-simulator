@@ -58,6 +58,46 @@ jobs:
       - name: Fail if the checked-in schema drifted from the API
         run: git diff --exit-code -- apps/web/src/api/schema.d.ts
 
+  e2e:
+    name: E2E — browser against the real stack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Build the web UI into wwwroot
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run E2E tests (Playwright boots the API)
+        working-directory: e2e
+        run: npx playwright test
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7
+
   web:
     name: Web — lint, test & build
     runs-on: ubuntu-latest
