@@ -8,6 +8,7 @@ export interface ToolbarProps {
   onRunTaskSequence: () => void;
   onScramble: () => void;
   onUndo: () => void;
+  onRewind: () => void;
   onReset: () => void;
 }
 
@@ -17,7 +18,7 @@ const secondaryButton =
   'rounded-md bg-slate-700/70 px-3 py-1.5 text-sm font-medium text-slate-100 ' +
   'transition hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-40';
 
-/** Session-level actions: run the task's sequence, scramble, undo, reset, cube size. */
+/** Session-level actions: run the task's sequence, scramble, undo, rewind, reset, cube size. */
 export function Toolbar({
   size,
   busy,
@@ -26,6 +27,7 @@ export function Toolbar({
   onRunTaskSequence,
   onScramble,
   onUndo,
+  onRewind,
   onReset,
 }: ToolbarProps) {
   return (
@@ -50,6 +52,15 @@ export function Toolbar({
         className={secondaryButton}
       >
         Undo
+      </button>
+      <button
+        type="button"
+        onClick={onRewind}
+        disabled={busy || !canUndo}
+        className={secondaryButton}
+        title="Replay the inverse of every move back to the solved cube"
+      >
+        Rewind
       </button>
       <button type="button" onClick={onReset} disabled={busy} className={secondaryButton}>
         Reset

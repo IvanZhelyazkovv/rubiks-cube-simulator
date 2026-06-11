@@ -4,11 +4,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CubeState } from './api/types';
 
-// jsdom has no WebGL; the 3D view is replaced by a marker. Its internal logic
-// lives in cube/geometry.ts, which has its own tests.
-vi.mock('./cube/Cube3D', () => ({
-  Cube3D: () => <div data-testid="cube-3d" />,
-}));
+// jsdom has no WebGL; the 3D view is replaced by a stand-in that completes any
+// requested animation immediately, so the full move lifecycle runs in tests.
+// The real view's internal logic lives in cube/geometry.ts with its own tests.
+vi.mock('./cube/Cube3D', async () => {
+  const { useEffect } = await import('react');
+  return {
+    Cube3D: ({
+      animation,
+      onAnimationComplete,
+    }: {
+      animation: unknown;
+      onAnimationComplete: () => void;
+    }) => {
+      useEffect(() => {
+        if (animation) {
+          onAnimationComplete();
+        }
+      });
+      return <div data-testid="cube-3d" />;
+    },
+  };
+});
 
 vi.mock('./api/client');
 
@@ -44,7 +61,7 @@ describe('App', () => {
     expect(client.createCube).toHaveBeenCalledWith(3);
   });
 
-  it('sends a move to the API when a pad button is clicked', async () => {
+  it('applies a pad move end to end: API call, animation, committed history', async () => {
     const afterMove: CubeState = { ...solved, isSolved: false, history: ['F'] };
     vi.mocked(client.applyMoves).mockResolvedValue(afterMove);
 
@@ -54,6 +71,23 @@ describe('App', () => {
     await userEvent.click(screen.getByRole('button', { name: 'F' }));
 
     await waitFor(() => expect(client.applyMoves).toHaveBeenCalledWith('session-1', 'F'));
+
+    // The stand-in 3D view completes the animation, so the new state commits:
+    // the history shows the move and the solved badge disappears.
+    expect(await screen.findByText('1 move')).toBeInTheDocument();
+    expect(screen.queryByTestId('solved-badge')).not.toBeInTheDocument();
+  });
+
+  it('applies keyboard moves, with Shift turning counter-clockwise', async () => {
+    const afterMove: CubeState = { ...solved, isSolved: false, history: ["R'"] };
+    vi.mocked(client.applyMoves).mockResolvedValue(afterMove);
+
+    render(<App />);
+    await screen.findByTestId('net-view');
+
+    await userEvent.keyboard('{Shift>}r{/Shift}');
+
+    await waitFor(() => expect(client.applyMoves).toHaveBeenCalledWith('session-1', "R'"));
   });
 
   it('shows API failures in the error banner', async () => {

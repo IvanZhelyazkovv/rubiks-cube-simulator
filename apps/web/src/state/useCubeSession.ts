@@ -8,6 +8,14 @@ import { formatMove, inverseOf, parseNotation, type Move } from '../cube/notatio
 export interface PendingAnimation {
   move: Move;
   nextState: CubeState;
+  /** Playback-speed multiplier; rewinding plays faster than normal turns. */
+  speed: number;
+}
+
+/** Progress of a multi-move run, e.g. “applying 3 of 6”. */
+export interface RunProgress {
+  done: number;
+  total: number;
 }
 
 /** Everything the UI needs to drive one cube session. */
@@ -16,22 +24,44 @@ export interface CubeSessionApi {
   state: CubeState | null;
   /** The animation the 3D view should currently play, if any. */
   animation: PendingAnimation | null;
-  /** Whether an operation is in flight — controls should be disabled. */
+  /** Whether an operation is in flight — non-queueable controls should be disabled. */
   busy: boolean;
+  /** Progress through the current queue of moves, when more than one is pending. */
+  progress: RunProgress | null;
   /** The most recent error, already in human-readable form. */
   error: string | null;
-  /** Applies a notation string, animating each move in order. */
+  /**
+   * Applies a notation string, animating each move in order. Moves requested
+   * while a run is in progress are queued and played afterwards.
+   */
   applySequence: (notation: string) => void;
   /** Undoes the last move with a reverse animation. */
   undo: () => void;
+  /** Replays the inverse of the whole history, rewinding the cube back to solved. */
+  rewind: () => void;
   /** Resets to the solved cube (no animation). */
   reset: () => void;
   /** Applies a random scramble (no animation). */
   scramble: () => void;
   /** Switches to a fresh session with a cube of the given size. */
   changeSize: (size: number) => void;
+  /** Clears the current error message. */
+  clearError: () => void;
   /** Must be called by the 3D view when the current animation finishes. */
   completeAnimation: () => void;
+}
+
+const REWIND_SPEED = 2.4;
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
 }
 
 /**
@@ -45,13 +75,21 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
   const [state, setState] = useState<CubeState | null>(null);
   const [animation, setAnimation] = useState<PendingAnimation | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<RunProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // The busy guard and the animation handshake live in refs: they must be
+  // checked and settled synchronously, independent of React's render timing.
+  const busyRef = useRef(false);
+  // True only while the move-queue drain runs — the one operation that accepts
+  // additional moves; everything else (scramble, undo, …) ignores new input.
+  const drainingRef = useRef(false);
+  const animationRef = useRef<PendingAnimation | null>(null);
   const animationDone = useRef<(() => void) | null>(null);
-
-  // Callbacks read the latest state through a ref so they can stay stable while
-  // sequences of awaited operations run. The ref is synced after every commit.
+  const queueRef = useRef<Move[]>([]);
+  const runTotals = useRef({ done: 0, total: 0 });
   const stateRef = useRef<CubeState | null>(null);
+
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
@@ -66,9 +104,9 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
           setState(created);
         }
       })
-      .catch((createError: Error) => {
+      .catch((createError: unknown) => {
         if (!cancelled) {
-          setError(createError.message);
+          setError(messageOf(createError));
         }
       });
 
@@ -77,61 +115,118 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
     };
   }, [size]);
 
-  /** Shows `move` in the 3D view and resolves once the view reports completion. */
-  const animateMove = useCallback(
-    (move: Move, nextState: CubeState) =>
-      new Promise<void>((resolve) => {
-        animationDone.current = resolve;
-        setAnimation({ move, nextState });
-      }),
-    [],
-  );
+  /**
+   * Shows `move` in the 3D view and resolves once the view reports completion.
+   * Honours the user's reduced-motion preference by committing immediately.
+   */
+  const animateMove = useCallback((move: Move, nextState: CubeState, speed = 1) => {
+    if (prefersReducedMotion()) {
+      setState(nextState);
+      return Promise.resolve();
+    }
+
+    return new Promise<void>((resolve) => {
+      animationDone.current = resolve;
+      const pending = { move, nextState, speed };
+      animationRef.current = pending;
+      setAnimation(pending);
+    });
+  }, []);
 
   const completeAnimation = useCallback(() => {
-    setAnimation((current) => {
-      if (current) {
-        setState(current.nextState);
-      }
-      return null;
-    });
+    const current = animationRef.current;
+    if (!current) {
+      return;
+    }
+
+    animationRef.current = null;
+    setState(current.nextState);
+    setAnimation(null);
+    animationDone.current?.();
+    animationDone.current = null;
+  }, []);
+
+  /** Abandons any in-flight animation handshake so awaited promises can't dangle. */
+  const releaseAnimation = useCallback(() => {
+    animationRef.current = null;
+    setAnimation(null);
     animationDone.current?.();
     animationDone.current = null;
   }, []);
 
   /** Serializes operations: one at a time, with busy state and error capture. */
-  const run = useCallback(
-    (operation: () => Promise<void>) => {
-      if (busy || !stateRef.current) {
+  const run = useCallback((operation: () => Promise<void>) => {
+    if (busyRef.current || !stateRef.current) {
+      return;
+    }
+
+    busyRef.current = true;
+    setBusy(true);
+    setError(null);
+    operation()
+      .catch((operationError: unknown) => {
+        queueRef.current = [];
+        setError(messageOf(operationError));
+      })
+      .finally(() => {
+        busyRef.current = false;
+        setBusy(false);
+        setProgress(null);
+        runTotals.current = { done: 0, total: 0 };
+      });
+  }, []);
+
+  const applySequence = useCallback(
+    (notation: string) => {
+      const parsed = parseNotation(notation);
+      if (!parsed.ok) {
+        setError(parsed.message);
+        return;
+      }
+      if (parsed.moves.length === 0) {
         return;
       }
 
-      setBusy(true);
-      setError(null);
-      operation()
-        .catch((operationError: Error) => setError(operationError.message))
-        .finally(() => setBusy(false));
-    },
-    [busy],
-  );
+      // A drain is already running — it will pick the new moves up.
+      if (drainingRef.current) {
+        queueRef.current.push(...parsed.moves);
+        runTotals.current.total += parsed.moves.length;
+        setProgress({ ...runTotals.current });
+        return;
+      }
 
-  const applySequence = useCallback(
-    (notation: string) =>
+      // Some other operation (scramble, undo, …) is running; those cannot
+      // absorb queued moves, so the input is ignored like a disabled button.
+      if (busyRef.current) {
+        return;
+      }
+
+      queueRef.current.push(...parsed.moves);
+      runTotals.current = { done: 0, total: parsed.moves.length };
+      drainingRef.current = true;
       run(async () => {
-        const parsed = parseNotation(notation);
-        if (!parsed.ok) {
-          throw new Error(parsed.message);
-        }
+        try {
+          let session = stateRef.current;
+          for (
+            let move = queueRef.current.shift();
+            move && session;
+            move = queueRef.current.shift()
+          ) {
+            if (runTotals.current.total > 1) {
+              setProgress({ ...runTotals.current });
+            }
 
-        for (const move of parsed.moves) {
-          const session = stateRef.current;
-          if (!session) {
-            return;
+            const next = await api.applyMoves(session.id, formatMove(move));
+            await animateMove(move, next);
+
+            session = next;
+            runTotals.current.done += 1;
           }
-
-          const next = await api.applyMoves(session.id, formatMove(move));
-          await animateMove(move, next);
+        } finally {
+          drainingRef.current = false;
         }
-      }),
+      });
+    },
     [run, animateMove],
   );
 
@@ -150,6 +245,33 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
           await animateMove(inverseOf(lastMove.moves[0]), next);
         } else {
           setState(next);
+        }
+      }),
+    [run, animateMove],
+  );
+
+  const rewind = useCallback(
+    () =>
+      run(async () => {
+        let session = stateRef.current;
+        runTotals.current = { done: 0, total: session?.history.length ?? 0 };
+
+        while (session && session.history.length > 0) {
+          if (runTotals.current.total > 1) {
+            setProgress({ ...runTotals.current });
+          }
+
+          const lastMove = parseNotation(session.history[session.history.length - 1]);
+          const next = await api.undoMove(session.id);
+
+          if (lastMove.ok && lastMove.moves.length === 1) {
+            await animateMove(inverseOf(lastMove.moves[0]), next, REWIND_SPEED);
+          } else {
+            setState(next);
+          }
+
+          session = next;
+          runTotals.current.done += 1;
         }
       }),
     [run, animateMove],
@@ -177,25 +299,39 @@ export function useCubeSession(initialSize = 3): CubeSessionApi {
     [run],
   );
 
-  // Resetting here (in the event handler, not the fetch effect) clears the old
-  // cube immediately while the effect creates the new session.
-  const changeSize = useCallback((newSize: number) => {
-    setState(null);
-    setAnimation(null);
-    setError(null);
-    setSize(newSize);
-  }, []);
+  const changeSize = useCallback(
+    (newSize: number) => {
+      // The old session is gone from the UI's point of view; tell the server
+      // too (best effort) and abandon any in-flight animation handshake.
+      const previous = stateRef.current;
+      if (previous) {
+        void api.deleteCube(previous.id).catch(() => undefined);
+      }
+
+      queueRef.current = [];
+      releaseAnimation();
+      setState(null);
+      setError(null);
+      setSize(newSize);
+    },
+    [releaseAnimation],
+  );
+
+  const clearError = useCallback(() => setError(null), []);
 
   return {
     state,
     animation,
     busy,
+    progress,
     error,
     applySequence,
     undo,
+    rewind,
     reset,
     scramble,
     changeSize,
+    clearError,
     completeAnimation,
   };
 }

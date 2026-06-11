@@ -1,7 +1,7 @@
 {
-  "name": "web",
+  "name": "rubiks-cube-web",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,16 +12,19 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "generate:api": "npx -y openapi-typescript@7.13.0 http://localhost:5180/swagger/v1/swagger.json -o src/api/schema.d.ts",
     "check": "npm run lint && npm run format:check && npm run test && npm run build"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "@tailwindcss/vite": "^4.3.0",
+    "openapi-fetch": "^0.17.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "tailwindcss": "^4.3.0",
-    "three": "^0.184.0"
+    "three": "^0.184.0",
+    "three-stdlib": "^2.36.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

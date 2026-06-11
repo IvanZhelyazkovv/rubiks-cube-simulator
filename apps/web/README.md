@@ -1,73 +1,29 @@
-# React + TypeScript + Vite
+# Web UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The interactive front end of the cube simulator: an animated 3D cube
+(react-three-fiber) next to the task's exploded view, with a move pad, keyboard
+control (U D F B L R, Shift for counter-clockwise), free-text sequences, undo,
+rewind, scramble and cube sizes from 2×2 to 5×5.
 
-Currently, two official plugins are available:
+The server is the single source of truth — this app holds no cube rules. Every
+mutation round-trips through the REST API; the client only animates the
+transition and then reveals the server's answer.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Commands
 
-## React Compiler
+| Command                                 | Purpose                                                                  |
+| --------------------------------------- | ------------------------------------------------------------------------ |
+| `npm run dev`                           | Dev server with hot reload (proxies `/api` to the API on port 5180)      |
+| `npm run build`                         | Production bundle, emitted into the API's `wwwroot`                      |
+| `npm run test`                          | Vitest suite                                                             |
+| `npm run lint` / `npm run format:check` | ESLint / Prettier gates                                                  |
+| `npm run generate:api`                  | Regenerate `src/api/schema.d.ts` from the running API's OpenAPI document |
+| `npm run check`                         | Everything CI runs: lint, format, tests, build                           |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## API client
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-    globalIgnores(['dist']),
-    {
-        files: ['**/*.{ts,tsx}'],
-        extends: [
-            // Other configs...
-
-            // Remove tseslint.configs.recommended and replace with this
-            tseslint.configs.recommendedTypeChecked,
-            // Alternatively, use this for stricter rules
-            tseslint.configs.strictTypeChecked,
-            // Optionally, add this for stylistic rules
-            tseslint.configs.stylisticTypeChecked,
-
-            // Other configs...
-        ],
-        languageOptions: {
-            parserOptions: {
-                project: ['./tsconfig.node.json', './tsconfig.app.json'],
-                tsconfigRootDir: import.meta.dirname,
-            },
-            // other options...
-        },
-    },
-]);
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x';
-import reactDom from 'eslint-plugin-react-dom';
-
-export default defineConfig([
-    globalIgnores(['dist']),
-    {
-        files: ['**/*.{ts,tsx}'],
-        extends: [
-            // Other configs...
-            // Enable lint rules for React
-            reactX.configs['recommended-typescript'],
-            // Enable lint rules for React DOM
-            reactDom.configs.recommended,
-        ],
-        languageOptions: {
-            parserOptions: {
-                project: ['./tsconfig.node.json', './tsconfig.app.json'],
-                tsconfigRootDir: import.meta.dirname,
-            },
-            // other options...
-        },
-    },
-]);
-```
+`src/api/schema.d.ts` is generated from the server's OpenAPI document and is
+never edited by hand — regenerate it with `npm run generate:api` (the API must
+be running). The typed client (`openapi-fetch`) checks every path, parameter,
+body and response against that contract at compile time, and CI fails if the
+checked-in schema drifts from the API.

@@ -1,3 +1,5 @@
+import type { components } from './schema';
+
 /** The six face names used by the API. */
 export type FaceName = 'up' | 'down' | 'front' | 'back' | 'left' | 'right';
 
@@ -8,16 +10,12 @@ export const FACE_NAMES: readonly FaceName[] = ['up', 'down', 'front', 'back', '
 export type ColorLetter = 'W' | 'Y' | 'G' | 'B' | 'R' | 'O';
 
 /**
- * The API's representation of a cube session — mirrors `CubeStateDto` on the server.
- * Each face is a list of rows (top to bottom) of colour letters (left to right).
+ * The API's representation of a cube session — generated from the server's
+ * OpenAPI document (`npm run generate:api`), so it cannot drift from the
+ * real contract. Each face is a list of rows (top to bottom) of colour
+ * letters (left to right).
  */
-export interface CubeState {
-  id: string;
-  size: number;
-  isSolved: boolean;
-  faces: Record<FaceName, string[]>;
-  history: string[];
-}
+export type CubeState = components['schemas']['CubeStateDto'];
 
 /** An error returned by the API as an RFC 9457 problem-details body. */
 export class ApiError extends Error {

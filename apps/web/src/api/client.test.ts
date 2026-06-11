@@ -10,6 +10,11 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+/** The openapi-fetch client hands a fully-built Request to fetch. */
+function sentRequest(fetchMock: ReturnType<typeof vi.fn>): Request {
+  return fetchMock.mock.calls[0][0] as Request;
+}
+
 describe('api client', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -21,10 +26,10 @@ describe('api client', () => {
 
     const cube = await client.createCube(4);
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/cubes',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify({ size: 4 }) }),
-    );
+    const request = sentRequest(fetchMock);
+    expect(new URL(request.url).pathname).toBe('/api/cubes');
+    expect(request.method).toBe('POST');
+    expect(await request.json()).toEqual({ size: 4 });
     expect(cube.size).toBe(4);
   });
 
@@ -34,22 +39,24 @@ describe('api client', () => {
 
     await client.applyMoves('abc', "F R'");
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/cubes/abc/moves',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify({ moves: "F R'" }) }),
-    );
+    const request = sentRequest(fetchMock);
+    expect(new URL(request.url).pathname).toBe('/api/cubes/abc/moves');
+    expect(request.method).toBe('POST');
+    expect(await request.json()).toEqual({ moves: "F R'" });
   });
 
   it.each([
     ['undoMove', '/api/cubes/abc/undo'],
     ['resetCube', '/api/cubes/abc/reset'],
-  ] as const)('%s posts to %s', async (method, url) => {
+  ] as const)('%s posts to %s', async (method, path) => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: 'abc' }));
     vi.stubGlobal('fetch', fetchMock);
 
     await client[method]('abc');
 
-    expect(fetchMock).toHaveBeenCalledWith(url, expect.objectContaining({ method: 'POST' }));
+    const request = sentRequest(fetchMock);
+    expect(new URL(request.url).pathname).toBe(path);
+    expect(request.method).toBe('POST');
   });
 
   it('turns problem-details responses into ApiError', async () => {
@@ -75,9 +82,20 @@ describe('api client', () => {
       vi.fn().mockResolvedValue(new Response('oops', { status: 502, statusText: 'Bad Gateway' })),
     );
 
-    const error = await client.getCube('abc').catch((caught: unknown) => caught);
+    const error = await client.applyMoves('abc', 'F').catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(ApiError);
-    expect((error as ApiError).title).toBe('Bad Gateway');
+    expect((error as ApiError).status).toBe(502);
+  });
+
+  it('deletes a session and tolerates the empty 204 response', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await client.deleteCube('abc');
+
+    const request = sentRequest(fetchMock);
+    expect(new URL(request.url).pathname).toBe('/api/cubes/abc');
+    expect(request.method).toBe('DELETE');
   });
 });

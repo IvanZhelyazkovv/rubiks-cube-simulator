@@ -2,3 +2,6 @@ dist/
 coverage/
 node_modules/
 package-lock.json
+
+# Generated from the API's OpenAPI document — never hand-edited.
+src/api/schema.d.ts
